@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' https://wow.zamimg.com https://cdn.raiderio.net data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'"
+    />
+    <title>M+ Talent &amp; Gear Inspector</title>
+    <link rel="stylesheet" href="../../node_modules/@fontsource/marcellus/index.css" />
+    <link rel="stylesheet" href="css/wow.css" />
+    <script src="../../node_modules/dompurify/dist/purify.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <div id="frame" class="wow-frame">
+      <div class="frame-corner tl"></div>
+      <div class="frame-corner tr"></div>
+      <div class="frame-corner bl"></div>
+      <div class="frame-corner br"></div>
+
+      <header class="titlebar">
+        <div id="portrait" class="portrait" hidden><img alt="" /></div>
+        <div class="title-text">
+          <span id="title-main">M+ Talent &amp; Gear Inspector</span>
+          <span id="title-sub" class="title-sub"></span>
+        </div>
+        <div class="win-buttons">
+          <button class="win-btn" data-action="settings" title="Settings">&#9881;</button>
+          <button class="win-btn" data-win="minimize" title="Minimize">&#8211;</button>
+          <button class="win-btn" data-win="maximize" title="Maximize">&#9633;</button>
+          <button class="win-btn close" data-win="close" title="Close">&#10005;</button>
+        </div>
+      </header>
+
+      <main id="view" class="view"></main>
+
+      <nav id="tabs" class="tabs" hidden>
+        <button class="tab active" data-tab="talents">Talents</button>
+        <button class="tab" data-tab="gear">Gear</button>
+        <button class="tab" data-tab="players">Players</button>
+      </nav>
+    </div>
+
+    <div id="tooltip" class="game-tooltip" hidden></div>
+    <div id="toast" class="toast" hidden></div>
+  </body>
+</html>

@@ -1,0 +1,42 @@
+{
+  "name": "class-spec-talent-gear",
+  "productName": "M+ Talent & Gear Inspector",
+  "version": "1.0.0",
+  "description": "Inspect the talents and gear of the top Mythic+ players for any retail WoW spec (data from raider.io).",
+  "main": "src/main/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/**/*.test.js\"",
+    "dist": "electron-builder --win portable",
+    "icon": "electron scripts/make-icon.js"
+  },
+  "build": {
+    "appId": "local.mplus.talentgear",
+    "productName": "M+ Talent & Gear Inspector",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "node_modules/dompurify/dist/purify.min.js",
+      "node_modules/@fontsource/marcellus/**/*"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "src/assets/icon.png"
+    },
+    "portable": {
+      "artifactName": "MPlusTalentGearInspector-portable.exe"
+    }
+  },
+  "dependencies": {
+    "@fontsource/marcellus": "^5.3.0",
+    "dompurify": "^3.4.17"
+  },
+  "devDependencies": {
+    "electron": "^44.9.1",
+    "electron-builder": "^26.15.3"
+  }
+}
