@@ -2,8 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, BrowserWindow, ipcMain, shell, clipboard, dialog, ClipboardItem } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, clipboard, dialog, ClipboardItem, session: electronSession } = require('electron');
 const cache = require('./cache');
+const stats = require('./stats');
 const settings = require('./settings');
 const history = require('./history');
 const raidbots = require('./sources/raidbots');
@@ -23,6 +24,38 @@ const EXTERNAL_HOSTS = new Set([
   'worldofwarcraft.blizzard.com',
 ]);
 const LOCALE_IDS = wowhead.LOCALES.map((l) => l.id);
+// Which data source each cache kind holds (for the developer menu).
+const KIND_SOURCE = {
+  run: 'raider.io',
+  rankings: 'raider.io',
+  profile: 'raider.io',
+  character: 'raider.io',
+  season: 'raider.io',
+  realms: 'raider.io',
+  itemTooltip: 'Wowhead',
+  spellTooltip: 'Wowhead',
+  itemSource: 'Wowhead',
+  talents: 'raidbots',
+  analysis: 'Analyses (built locally)',
+};
+const EMPTY_TOTALS = { requests: 0, bytes: 0, errors: 0, retries: 0, ms: 0, avgMs: 0 };
+const ICON_SOURCE = 'Icons (CDN)';
+const ICON_URLS = ['https://wow.zamimg.com/*', 'https://cdn.raiderio.net/*'];
+
+/** Count icon downloads made by the page (they bypass our http module). */
+function trackIconDownloads() {
+  const started = new Map();
+  const { webRequest } = electronSession.defaultSession;
+  webRequest.onSendHeaders({ urls: ICON_URLS }, (d) => started.set(d.id, d.timestamp));
+  webRequest.onCompleted({ urls: ICON_URLS }, (d) => {
+    const t0 = started.get(d.id);
+    started.delete(d.id);
+    if (d.fromCache) return;
+    const header = Object.entries(d.responseHeaders || {}).find(([k]) => k.toLowerCase() === 'content-length');
+    stats.recordRequest({ url: d.url, status: d.statusCode, bytes: Number(header?.[1]?.[0]) || 0, ms: t0 ? d.timestamp - t0 : 0, log: false });
+  });
+  webRequest.onErrorOccurred({ urls: ICON_URLS }, (d) => started.delete(d.id));
+}
 
 let win = null;
 let current = null; // AbortController of the running analysis / dungeon load
@@ -189,6 +222,50 @@ ipcMain.handle('character:load', async (_e, { region, realm, name, force = false
   }
 });
 
+ipcMain.handle('realms:list', async (_e, region) => {
+  try {
+    return await raiderio.getRealms(region);
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle('dev:stats', async () => {
+  const snap = stats.snapshot();
+  const kinds = await cache.infoByKind();
+  const disk = {};
+  for (const [kind, info] of Object.entries(kinds)) {
+    const source = KIND_SOURCE[kind] || 'Other';
+    disk[source] ||= { bytes: 0, files: 0 };
+    disk[source].bytes += info.bytes;
+    disk[source].files += info.files;
+  }
+  // Icons live in Chromium's own cache folder.
+  const iconDisk = await cache.dirSize(path.join(app.getPath('userData'), 'Cache'));
+  disk[ICON_SOURCE] = iconDisk;
+  kinds.browserCache = iconDisk;
+  const names = new Set(['raider.io', 'Wowhead', 'raidbots', ICON_SOURCE, ...Object.keys(snap.session), ...Object.keys(snap.lifetime), ...Object.keys(disk)]);
+  return {
+    sources: [...names].map((source) => ({
+      source,
+      session: snap.session[source] || EMPTY_TOTALS,
+      lifetime: snap.lifetime[source] || EMPTY_TOTALS,
+      disk: disk[source] || { bytes: 0, files: 0 },
+    })),
+    lifetimeSince: snap.lifetimeSince,
+    kinds: Object.entries(kinds)
+      .map(([kind, info]) => ({ kind, source: kind === 'browserCache' ? ICON_SOURCE : KIND_SOURCE[kind] || 'Other', ...info, ...(snap.cache[kind] || { hits: 0, misses: 0 }) }))
+      .sort((a, b) => b.bytes - a.bytes),
+    recent: snap.recent,
+    userData: app.getPath('userData'),
+    versions: { app: app.getVersion(), electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node },
+  };
+});
+
+ipcMain.handle('dev:reset', () => stats.resetLifetime());
+ipcMain.handle('dev:openDevTools', () => win?.webContents.openDevTools({ mode: 'detach' }));
+ipcMain.handle('dev:openFolder', () => shell.openPath(app.getPath('userData')));
+
 ipcMain.handle('history:list', async () => {
   if (!session) return [];
   const all = await history.list(history.keyFor(session.meta));
@@ -231,6 +308,7 @@ ipcMain.handle('settings:set', (_e, patch) => {
 ipcMain.handle('cache:info', () => cache.info());
 ipcMain.handle('cache:clear', async () => {
   await cache.clear();
+  await electronSession.defaultSession.clearCache(); // icons
   return cache.info();
 });
 
@@ -252,8 +330,11 @@ app.whenReady().then(() => {
   const userData = app.getPath('userData');
   cache.init(userData);
   history.init(userData);
+  stats.init(userData);
+  trackIconDownloads();
   wowhead.setLocale(settings.init(userData, LOCALE_IDS).tooltipLocale);
   createWindow();
 });
 
 app.on('window-all-closed', () => app.quit());
+app.on('will-quit', () => stats.flush());

@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const stats = require('./stats');
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -14,6 +15,7 @@ const TTL = {
   rankings: HOUR,
   profile: HOUR,
   character: HOUR,
+  realms: 7 * DAY,
   run: Infinity,
   itemTooltip: 7 * DAY,
   itemSource: 7 * DAY,
@@ -24,9 +26,27 @@ const TTL = {
 let cacheDir = null;
 const memory = new Map();
 
+// Not "cache": on Windows that is the same folder as Chromium's own "Cache" in userData.
+const DIR_NAME = 'data-cache';
+const LEGACY_DIR_NAME = 'cache';
+
 function init(baseDir) {
-  cacheDir = path.join(baseDir, 'cache');
+  cacheDir = path.join(baseDir, DIR_NAME);
   fs.mkdirSync(cacheDir, { recursive: true });
+  migrateLegacy(path.join(baseDir, LEGACY_DIR_NAME));
+}
+
+/** Move our data out of the folder shared with Chromium's cache (older versions used it). */
+function migrateLegacy(legacyDir) {
+  for (const kind of Object.keys(TTL)) {
+    const from = path.join(legacyDir, kind);
+    const to = path.join(cacheDir, kind);
+    try {
+      if (fs.existsSync(from) && !fs.existsSync(to)) fs.renameSync(from, to);
+    } catch {
+      // keep going; the data is only a cache
+    }
+  }
 }
 
 function fileFor(kind, key) {
@@ -38,7 +58,13 @@ function fileFor(kind, key) {
  * Cached value for (kind, key), or undefined. `ignoreTtl` also returns expired entries
  * (used to reopen the last results instantly). Returns `{ value, at }` when `withTime` is set.
  */
-async function read(kind, key, { ignoreTtl = false, withTime = false } = {}) {
+async function read(kind, key, opts = {}) {
+  const found = await lookup(kind, key, opts);
+  stats.recordCache(kind, found !== undefined);
+  return found;
+}
+
+async function lookup(kind, key, { ignoreTtl = false, withTime = false }) {
   const ttl = ignoreTtl ? Infinity : TTL[kind] ?? HOUR;
   const memKey = `${kind}:${key}`;
   const hit = memory.get(memKey);
@@ -117,6 +143,20 @@ function info() {
   return cacheDir ? dirSize(cacheDir) : Promise.resolve({ bytes: 0, files: 0 });
 }
 
+/** Disk usage per cache kind: { kind: { bytes, files } }. */
+async function infoByKind() {
+  if (!cacheDir) return {};
+  let kinds = [];
+  try {
+    kinds = (await fs.promises.readdir(cacheDir, { withFileTypes: true })).filter((e) => e.isDirectory()).map((e) => e.name);
+  } catch {
+    return {};
+  }
+  const out = {};
+  for (const kind of kinds) out[kind] = await dirSize(path.join(cacheDir, kind));
+  return out;
+}
+
 /** Delete everything in the cache (memory and disk). */
 async function clear() {
   memory.clear();
@@ -125,4 +165,4 @@ async function clear() {
   await fs.promises.mkdir(cacheDir, { recursive: true });
 }
 
-module.exports = { init, read, write, cached, info, clear, TTL };
+module.exports = { init, read, write, cached, info, infoByKind, dirSize, clear, TTL };

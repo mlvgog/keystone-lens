@@ -6,7 +6,7 @@ import { renderTalents, pickMap, clearSpellCache } from './talentTree.js';
 import { renderGear } from './gearView.js';
 import { renderPlayers } from './playersView.js';
 import { renderFilterBar } from './filterBar.js';
-import { compareDialog, settingsDialog } from './dialogs.js';
+import { compareDialog, settingsDialog, devDialog } from './dialogs.js';
 
 const viewEl = document.getElementById('view');
 const tabs = document.getElementById('tabs');
@@ -75,6 +75,14 @@ document.querySelector('[data-action=settings]').addEventListener('click', () =>
     },
   })
 );
+
+// Developer menu: Ctrl+Shift+D (also reachable from Settings).
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+    e.preventDefault();
+    devDialog();
+  }
+});
 
 function setHeader(opts) {
   if (!opts) {
@@ -179,18 +187,53 @@ function applyResult(opts, result) {
   restoreCharacter();
 }
 
-/** Re-load the character you compared with last time (if it is the same class). */
+// ---------------------------------------------------------------- remembered characters (compare)
+const MAX_CHARACTERS = 12;
+const charKey = (c) => `${c.region}|${String(c.realm).toLowerCase()}|${String(c.name).toLowerCase()}`;
+
+/** Remembered characters, most recently used first (migrates the old single entry). */
+function savedCharacters() {
+  const prefs = loadPrefs();
+  const list = prefs.characters || (prefs.character ? [{ ...prefs.character, lastUsed: 0 }] : []);
+  return [...list].sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
+}
+
+function rememberCharacter(who, character) {
+  const entry = {
+    region: who.region,
+    realm: character.realm || who.realm,
+    name: character.name || who.name,
+    className: character.className,
+    specName: character.activeSpecName,
+    lastUsed: Date.now(),
+  };
+  const rest = savedCharacters().filter((c) => charKey(c) !== charKey(entry));
+  savePrefs({ characters: [entry, ...rest].slice(0, MAX_CHARACTERS), character: undefined });
+}
+
+function forgetCharacter(c) {
+  savePrefs({ characters: savedCharacters().filter((x) => charKey(x) !== charKey(c)) });
+}
+
+function classColor(className) {
+  return state.classes?.find((c) => c.className === className)?.color || (className === state.meta?.className ? state.meta.color : '#c9c2ad');
+}
+
+/** While comparing, load the most recently used remembered character of this class. */
 async function restoreCharacter() {
   const prefs = loadPrefs();
-  if (!prefs.compareActive || !prefs.character) {
+  if (!prefs.compareActive) {
     state.character = null;
     return;
   }
   if (state.character && state.character.className === state.meta.className) return;
   state.character = null;
-  const res = await window.api.loadCharacter(prefs.character);
+  const mine = savedCharacters().find((c) => c.className === state.meta.className);
+  if (!mine) return;
+  const res = await window.api.loadCharacter(mine);
   if (res.ok && res.character.className === state.meta.className) {
     state.character = res.character;
+    rememberCharacter(mine, res.character);
     if (dom) renderAll();
   }
 }
@@ -441,16 +484,21 @@ function exitInspect() {
   renderAll();
 }
 
-function openCompare() {
+async function openCompare() {
+  if (!state.classes) state.classes = await window.api.listSpecs().catch(() => null); // for class colours
   compareDialog({
-    saved: loadPrefs().character,
+    getSaved: savedCharacters,
     meta: state.meta,
+    classColor,
     active: !!state.character,
-    onLoaded: (character, who) => {
+    onLoaded: (character, who, { apply = true } = {}) => {
+      rememberCharacter(who, character);
+      if (!apply) return;
       state.character = character;
-      savePrefs({ character: who, compareActive: true });
+      savePrefs({ compareActive: true });
       renderAll();
     },
+    onForget: forgetCharacter,
     onStop: stopCompare,
   });
 }

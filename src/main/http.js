@@ -1,5 +1,7 @@
 'use strict';
 
+const stats = require('./stats');
+
 const USER_AGENT = 'MPlusTalentGearInspector/1.0 (desktop app)';
 
 function abortError() {
@@ -77,6 +79,7 @@ async function request(url, { signal, retries = 5, as = 'json' } = {}) {
       if (signal?.aborted) throw abortError();
       const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
       const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+      const started = performance.now();
       let res;
       let body;
       try {
@@ -84,15 +87,21 @@ async function request(url, { signal, retries = 5, as = 'json' } = {}) {
           headers: { 'User-Agent': USER_AGENT, Accept: as === 'json' ? 'application/json' : '*/*' },
           signal: combined,
         });
-        if (res.ok) body = as === 'json' ? await res.json() : await res.text();
+        if (res.ok) {
+          const text = await res.text();
+          body = as === 'json' ? JSON.parse(text) : text;
+          stats.recordRequest({ url, status: res.status, bytes: Buffer.byteLength(text), ms: performance.now() - started, retry: attempt > 0 });
+        }
       } catch (err) {
         if (signal?.aborted) throw abortError();
+        stats.recordRequest({ url, status: res?.status ?? null, ms: performance.now() - started, retry: attempt > 0, error: err.message });
         // Timeouts, network errors and truncated bodies are retried.
         if (attempt >= retries) throw new Error(`Network error for ${url}: ${err.message}`);
         await sleep(backoffMs(attempt), signal);
         continue;
       }
       if (res.ok) return body;
+      stats.recordRequest({ url, status: res.status, ms: performance.now() - started, retry: attempt > 0, error: `HTTP ${res.status}` });
       if ((res.status === 429 || res.status >= 500) && attempt < retries) {
         const retryAfter = Number(res.headers.get('retry-after'));
         await sleep(retryAfter > 0 ? retryAfter * 1000 : backoffMs(attempt), signal);

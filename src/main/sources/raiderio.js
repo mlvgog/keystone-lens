@@ -38,6 +38,27 @@ async function getCurrentSeason({ signal, force } = {}) {
   }, { force });
 }
 
+/**
+ * Realm names of a region from raider.io's leaderboard-capacity listing (grouped by connected
+ * realm): [{ name, altName }] sorted by name. `altName` is the localized name (KR/TW/CN).
+ */
+function parseRealmListing(json) {
+  const byName = new Map();
+  for (const group of json?.realmListing?.realms || []) {
+    for (const r of group.connectedRealms || []) {
+      if (!r?.name || byName.has(r.name)) continue;
+      byName.set(r.name, { name: r.name, altName: r.altName && r.altName !== r.name ? r.altName : null });
+    }
+  }
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** All realms of a region (for realm autocomplete). Cached for a week. */
+async function getRealms(region, { signal } = {}) {
+  const url = `${BASE}/api/v1/mythic-plus/leaderboard-capacity?region=${encodeURIComponent(region)}`;
+  return cache.cached('realms', url, async () => parseRealmListing(await fetchJson(url, { signal })));
+}
+
 /** Raids of an expansion: [{ zoneId, name, encounters: [name] }] (used to tag item sources). */
 async function getRaids(expansionId, { signal } = {}) {
   const url = `${BASE}/api/v1/raiding/static-data?expansion_id=${expansionId}`;
@@ -238,4 +259,16 @@ function runUrl(season, id) {
   return `${BASE}/mythic-plus-runs/${season}/${id}`;
 }
 
-module.exports = { getCurrentSeason, getRaids, getSpecRankings, getRecentRuns, getRunDetails, getCharacter, slugifyRealm, profileUrl, runUrl };
+module.exports = {
+  getCurrentSeason,
+  getRaids,
+  getRealms,
+  parseRealmListing,
+  getSpecRankings,
+  getRecentRuns,
+  getRunDetails,
+  getCharacter,
+  slugifyRealm,
+  profileUrl,
+  runUrl,
+};

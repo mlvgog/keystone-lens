@@ -41,7 +41,8 @@ These sit under the title and apply to every tab.
 - Click a row to **inspect** that player: their own talent tree and gear.
 
 ### Compare with my character
-- Enter your region, realm and name.
+- Enter your region, realm and name. The realm field suggests realm names as you type (all realms of the region, including Korean and Chinese names).
+- Characters you load are remembered: click one to load it again, or start typing its name. While comparing, opening another spec automatically loads your most recently used character of that class.
 - Your talents are overlaid on the tree:
   - ✔ marks your picks.
   - A red ring marks a popular talent you skip.
@@ -52,6 +53,7 @@ These sit under the title and apply to every tab.
 - **Export:** save or copy the talent tree as an image, for example for Discord.
 - **Settings (⚙):** tooltip language (9 languages), default region and player count, cache size and clear cache.
 - **Reopening:** the app reopens your last results instantly. Recent searches show on the class picker.
+- **Developer menu** (Settings → Developer…, or **Ctrl+Shift+D**): how much data was downloaded from each source, this session and all time (raider.io, Wowhead, raidbots, icon CDNs). It also shows request counts, average response time, errors, what is cached on disk per data type with hit rates, and a live list of the latest requests. Buttons: open DevTools, open the data folder, reset counters, clear cache.
 
 ## Running it
 
@@ -90,7 +92,7 @@ A cold run makes roughly 150–450 requests and usually takes 40 seconds to 3 mi
 | Item and spell tooltips, item sources | 7 days |
 | Talent trees | 1 day |
 
-The cache lives in `%APPDATA%\M+ Talent & Gear Inspector\cache`, and you can clear it in Settings. Trend history is stored in `...\history` and settings in `...\settings.json`.
+The cache lives in `%APPDATA%\M+ Talent & Gear Inspector\data-cache`, and you can clear it in Settings. Trend history is stored in `...\history`, settings in `...\settings.json`, and the developer-menu totals in `...\stats.json`.
 
 ## Data sources
 
@@ -129,5 +131,6 @@ npm run icon
 | `src/main/itemInfo.js` | Stats and source parsing |
 | `src/main/history.js` | Trend snapshots |
 | `src/main/settings.js` | Settings |
+| `src/main/stats.js` | Download and cache statistics for the developer menu |
 | `src/main/sources/` | raider.io / raidbots / Wowhead clients (rate limited, retried, cached) |
 | `src/renderer/` | UI (plain HTML/CSS/ES modules) |
