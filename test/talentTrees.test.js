@@ -80,18 +80,20 @@ test('trees per spec: alternatives at one position, hero variants, free nodes, c
     trait({ tree: 4, nodeId: 50, entryId: 150, name: '0', spellId: 0, specs: [259, 261], subTreeId: 53, nodeType: 3 }),
   ];
   const nodes = new Map([
-    [1, { posX: 600, posY: 600 }],
-    [2, { posX: 1197, posY: 1203 }],
-    [5, { posX: 1200, posY: 1200 }],
-    [6, { posX: 3000, posY: 3000 }],
-    [20, { posX: 9000, posY: 600 }],
-    [21, { posX: 9000, posY: 1200 }],
-    [22, { posX: 9600, posY: 1200 }],
-    [30, { posX: 9000, posY: 600 }],
-    [40, { posX: 7200, posY: 600 }],
-    [41, { posX: 7200, posY: 600 }],
-    [42, { posX: 7200, posY: 1200 }],
-    [50, { posX: 7200, posY: 0 }],
+    [1, { posX: 600, posY: 600, treeId: 852 }],
+    [2, { posX: 1197, posY: 1203, treeId: 852 }],
+    [5, { posX: 1200, posY: 1200, treeId: 852 }],
+    [6, { posX: 3000, posY: 3000, treeId: 852 }],
+    [20, { posX: 9000, posY: 600, treeId: 852 }],
+    [21, { posX: 9000, posY: 1200, treeId: 852 }],
+    [22, { posX: 9600, posY: 1200, treeId: 852 }],
+    [30, { posX: 9000, posY: 600, treeId: 852 }],
+    [40, { posX: 7200, posY: 600, treeId: 852 }],
+    [41, { posX: 7200, posY: 600, treeId: 852 }],
+    [42, { posX: 7200, posY: 1200, treeId: 852 }],
+    [50, { posX: 7200, posY: 0, treeId: 852 }],
+    [3, { posX: 0, posY: 0, treeId: 852 }], // in the class's game tree, not used by these specs
+    [900, { posX: 0, posY: 0, treeId: 999 }], // another class
   ]);
   const edges = [
     { from: 1, to: 2 },
@@ -121,6 +123,9 @@ test('trees per spec: alternatives at one position, hero variants, free nodes, c
   assert.deepEqual(trees.map((t) => t.specName), ['Assassination', 'Subtlety']);
   const [assa, sub] = trees;
   assert.equal(assa.className, 'Rogue');
+  // The game tree and all its nodes in id order (what talent export strings follow).
+  assert.equal(assa.traitTreeId, 852);
+  assert.deepEqual(assa.fullNodeOrder, [1, 2, 3, 5, 6, 20, 21, 22, 30, 40, 41, 42, 50]);
 
   // Class tree: oldest alternative, placeholder dropped, positions rounded to 10, edges, free node.
   assert.deepEqual(assa.classNodes.map((n) => n.id), [1, 2]);

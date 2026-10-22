@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   playerDetail: (index, dungeon) => ipcRenderer.invoke('player:detail', { index, dungeon }),
   describeItems: (variants) => ipcRenderer.invoke('items:describe', variants),
   loadCharacter: (who) => ipcRenderer.invoke('character:load', who),
+  importSimc: (text, opts) => ipcRenderer.invoke('character:import', text, opts),
   historyList: () => ipcRenderer.invoke('history:list'),
   realms: (region) => ipcRenderer.invoke('realms:list', region),
   devStats: () => ipcRenderer.invoke('dev:stats'),

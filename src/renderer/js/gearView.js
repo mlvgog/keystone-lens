@@ -123,7 +123,21 @@ function yourSlotLine(group, character) {
           : rank > 0
             ? el('span.meh', `used by ${pct(group.items[rank].pct)}`)
             : el('span.bad', 'not used by top players');
-      return [i ? el('span.faint', '  |  ') : null, iconImg(it.icon, { cls: 'mini-icon' }), el('span', { style: { color: qualityColor(it.quality) } }, ` ${it.name} `), el('span.faint', `${it.ilvl} `), status];
+      const item = el('span.your-item', iconImg(it.icon, { cls: 'mini-icon' }), el('span', { style: { color: qualityColor(it.quality) } }, ` ${it.name} `), el('span.faint', `${it.ilvl} `));
+      // Your exact item (bonus IDs, item level, gems) in Wowhead's tooltip.
+      attachTooltip(
+        item,
+        () =>
+          el(
+            'div',
+            el('div.tt-title', { style: { color: qualityColor(it.quality) } }, it.name),
+            el('div.tt-gold', `Your item · item level ${it.ilvl}`),
+            statsLine(it.details),
+            ...detailLines(it.details)
+          ),
+        { wowhead: () => itemRef({ id: it.id, bonuses: it.bonuses, ilvl: it.ilvl, gems: (it.gems || []).map((g) => g.id) }) }
+      );
+      return [i ? el('span.faint', '  |  ') : null, item, status];
     })
   );
 }

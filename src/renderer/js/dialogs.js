@@ -63,9 +63,32 @@ export function compareDialog({ getSaved, meta, classColor, onLoaded, onForget, 
   region.value = last?.region || (meta.region !== 'world' ? meta.region : 'eu');
   const realm = el('input.wow-input', { placeholder: 'Start typing, e.g. Tarren Mill', value: '' });
   const name = el('input.wow-input', { placeholder: 'Character name', value: '' });
+  const simcText = el('textarea.wow-textarea', { placeholder: 'In game, type /simc, copy all of the text and paste it here.', spellcheck: 'false', rows: 7 });
   const status = el('div.dialog-status');
   const load = el('button.wow-btn', 'Load character');
   const stop = active ? el('button.wow-btn', { onclick: () => { onStop(); dlg.close(); } }, 'Stop comparing') : null;
+
+  // Two ways in: look the character up on raider.io, or paste a SimulationCraft export.
+  let mode = last?.source === 'simc' ? 'simc' : 'rio';
+  const modeButtons = [
+    ['rio', 'Look up on raider.io'],
+    ['simc', 'Paste from SimulationCraft'],
+  ].map(([value, label]) => el('button.seg', { dataset: { mode: value }, onclick: () => setMode(value) }, label));
+  const rioFields = el('div.dialog-form', el('label', 'Region', region), el('label', 'Realm', realm), el('label', 'Character', name));
+  const simcFields = el(
+    'div.dialog-form',
+    simcText,
+    el('p.faint.small', 'Uses exactly what you have equipped and talented, including crafted stats and catalysed items. Saved loadouts in the export can be compared too.')
+  );
+  function setMode(value) {
+    mode = value;
+    modeButtons.forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+    rioFields.hidden = mode !== 'rio';
+    simcFields.hidden = mode !== 'simc';
+    load.textContent = mode === 'simc' ? 'Import' : 'Load character';
+    status.textContent = '';
+    setTimeout(() => (mode === 'simc' ? simcText : realm).focus(), 0);
+  }
 
   // Saved characters: this class first, most recently used first.
   const savedRow = el('div.saved-chars');
@@ -77,6 +100,7 @@ export function compareDialog({ getSaved, meta, classColor, onLoaded, onForget, 
       ...(list.length
         ? list.map((c) => {
             const other = c.className && c.className !== meta.className;
+            const simc = c.source === 'simc';
             const forget = el('button.chip-x', { title: 'Forget this character' }, '✕');
             forget.addEventListener('click', (e) => {
               e.stopPropagation();
@@ -86,8 +110,10 @@ export function compareDialog({ getSaved, meta, classColor, onLoaded, onForget, 
             const chip = el(
               'div.saved-char',
               {
-                title: other ? `${c.className} — this analysis is for ${meta.className}` : `Load ${c.name}`,
+                title: other ? `${c.className} — this analysis is for ${meta.className}` : `Load ${c.name}${simc ? ' from the saved SimulationCraft export' : ''}`,
                 onclick: () => {
+                  if (simc) return importSimc(c.simc, c.loadout || 0);
+                  setMode('rio');
                   region.value = c.region;
                   realm.value = c.realm;
                   name.value = c.name;
@@ -96,6 +122,7 @@ export function compareDialog({ getSaved, meta, classColor, onLoaded, onForget, 
               },
               el('span', { style: { color: classColor(c.className) } }, c.name),
               el('span.faint', ` ${c.realm} (${String(c.region).toUpperCase()})`),
+              simc ? el('span.tag.simc', 'SimC') : null,
               forget
             );
             if (other) chip.classList.add('other-class');
@@ -106,7 +133,41 @@ export function compareDialog({ getSaved, meta, classColor, onLoaded, onForget, 
   }
   renderSaved();
 
+  /** A loaded character: apply it, or keep it for later when it is another class. */
+  function loaded(c, who) {
+    if (c.className !== meta.className) {
+      status.className = 'dialog-status bad';
+      status.textContent = `${c.name} is a ${c.className}; this analysis is for ${meta.className}. (Saved for when you look at ${c.className}s.)`;
+      onLoaded(c, who, { apply: false });
+      renderSaved();
+      return;
+    }
+    onLoaded(c, who, { apply: true });
+    dlg.close();
+  }
+
+  async function importSimc(text, loadout = 0) {
+    if (!String(text || '').trim()) {
+      status.className = 'dialog-status bad';
+      status.textContent = 'Paste the text from /simc first.';
+      return;
+    }
+    load.disabled = true;
+    status.className = 'dialog-status';
+    status.textContent = 'Reading the SimulationCraft export…';
+    const res = await window.api.importSimc(text, { loadout });
+    load.disabled = false;
+    if (!res.ok) {
+      status.className = 'dialog-status bad';
+      status.textContent = res.error || 'Could not read that export.';
+      return;
+    }
+    const c = res.character;
+    loaded(c, { source: 'simc', simc: text, loadout: c.loadout, region: c.region, realm: c.realm, name: c.name });
+  }
+
   async function submit() {
+    if (mode === 'simc') return importSimc(simcText.value);
     const typedRealm = realm.value.trim();
     const who = { region: region.value, realm: typedRealm, name: name.value.trim() };
     if (!who.realm || !who.name) {
@@ -130,16 +191,7 @@ export function compareDialog({ getSaved, meta, classColor, onLoaded, onForget, 
           : res.error || 'Could not load that character.';
       return;
     }
-    const c = res.character;
-    if (c.className !== meta.className) {
-      status.className = 'dialog-status bad';
-      status.textContent = `${c.name} is a ${c.className}; this analysis is for ${meta.className}. (Saved for when you look at ${c.className}s.)`;
-      onLoaded(c, who, { apply: false });
-      renderSaved();
-      return;
-    }
-    onLoaded(c, who, { apply: true });
-    dlg.close();
+    loaded(res.character, who);
   }
 
   // Realm suggestions for the selected region (English or localized names).
@@ -152,9 +204,9 @@ export function compareDialog({ getSaved, meta, classColor, onLoaded, onForget, 
       name.focus();
     },
   });
-  // Name suggestions from remembered characters (fills in region and realm too).
+  // Name suggestions from remembered raider.io characters (fills in region and realm too).
   attachAutocomplete(name, {
-    source: (q) => matchItems(getSaved(), q, (c) => [c.name]),
+    source: (q) => matchItems(getSaved().filter((c) => c.source !== 'simc'), q, (c) => [c.name]),
     render: (c) => [el('span', { style: { color: classColor(c.className) } }, c.name), el('span.faint', `  ${c.realm} (${String(c.region).toUpperCase()})`)],
     onPick: (c) => {
       region.value = c.region;
@@ -173,19 +225,19 @@ export function compareDialog({ getSaved, meta, classColor, onLoaded, onForget, 
     'Compare with my character',
     el(
       'div.dialog-form',
-      el('p.dim', 'Your current talents and gear (from raider.io) are shown on top of what the top players use.'),
+      el('p.dim', 'Your talents and gear are shown on top of what the top players use: looked up on raider.io, or pasted from the SimulationCraft addon.'),
       el('div.saved-label.fb-label', 'Saved characters'),
       savedRow,
       el('div.dialog-sep'),
-      el('label', 'Region', region),
-      el('label', 'Realm', realm),
-      el('label', 'Character', name),
+      el('div.segmented.compare-modes', modeButtons),
+      rioFields,
+      simcFields,
       status,
       el('div.dialog-buttons', stop, load)
     ),
-    { width: 520 }
+    { width: 560 }
   );
-  setTimeout(() => realm.focus(), 0);
+  setMode(mode);
 }
 
 function formatBytes(n) {

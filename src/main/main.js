@@ -49,6 +49,7 @@ const { analyze, loadDungeon } = require('./collector');
 const { buildView, playerDetail } = require('./views');
 const throughput = require('./throughput');
 const { classifySource } = require('./itemInfo');
+const { importSimcCharacter } = require('./simcImport');
 
 const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
 const EXTERNAL_HOSTS = new Set([
@@ -258,6 +259,15 @@ ipcMain.handle('items:describe', async (_e, variants = []) => {
 ipcMain.handle('character:load', async (_e, { region, realm, name, force = false }) => {
   try {
     return { ok: true, character: await raiderio.getCharacter({ region, realm, name }, { force }) };
+  } catch (err) {
+    return failure(err);
+  }
+});
+
+/** Your character from a pasted SimulationCraft export (`loadout`: 0 = active talents, 1.. = saved). */
+ipcMain.handle('character:import', async (_e, text, { loadout = 0 } = {}) => {
+  try {
+    return { ok: true, character: await importSimcCharacter(String(text || '').slice(0, 100000), { loadout: Number(loadout) || 0 }) };
   } catch (err) {
     return failure(err);
   }

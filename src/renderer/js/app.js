@@ -196,7 +196,8 @@ function applyResult(opts, result) {
 
 // ---------------------------------------------------------------- remembered characters (compare)
 const MAX_CHARACTERS = 12;
-const charKey = (c) => `${c.region}|${String(c.realm).toLowerCase()}|${String(c.name).toLowerCase()}`;
+// A raider.io lookup and a SimulationCraft import of the same character are kept apart.
+const charKey = (c) => `${c.source || 'rio'}|${c.region}|${String(c.realm).toLowerCase()}|${String(c.name).toLowerCase()}`;
 
 /** Remembered characters, most recently used first (migrates the old single entry). */
 function savedCharacters() {
@@ -205,9 +206,16 @@ function savedCharacters() {
   return [...list].sort((a, b) => (b.lastUsed || 0) - (a.lastUsed || 0));
 }
 
+/**
+ * `who`: what the character was loaded from: { region, realm, name } for raider.io, or
+ * { source: 'simc', simc: <export text>, loadout } for a SimulationCraft export (kept so the
+ * character can be loaded again without pasting).
+ */
 function rememberCharacter(who, character) {
+  const simc = who.source === 'simc';
   const entry = {
-    region: who.region,
+    ...(simc ? { source: 'simc', simc: who.simc, loadout: character.loadout ?? who.loadout ?? 0 } : {}),
+    region: character.region || who.region,
     realm: character.realm || who.realm,
     name: character.name || who.name,
     className: character.className,
@@ -226,6 +234,16 @@ function classColor(className) {
   return state.classes?.find((c) => c.className === className)?.color || (className === state.meta?.className ? state.meta.color : '#c9c2ad');
 }
 
+/** Load a remembered character again: from its saved SimulationCraft export, or from raider.io. */
+function loadSaved(c, loadout = c.loadout || 0) {
+  return c.source === 'simc' ? window.api.importSimc(c.simc, { loadout }) : window.api.loadCharacter(c);
+}
+
+/** The character plus the export it came from, so another saved loadout can be picked later. */
+function withSource(character, who) {
+  return who.source === 'simc' ? { ...character, simc: who.simc } : character;
+}
+
 /** While comparing, load the most recently used remembered character of this class. */
 async function restoreCharacter() {
   const prefs = loadPrefs();
@@ -237,9 +255,9 @@ async function restoreCharacter() {
   state.character = null;
   const mine = savedCharacters().find((c) => c.className === state.meta.className);
   if (!mine) return;
-  const res = await window.api.loadCharacter(mine);
+  const res = await loadSaved(mine);
   if (res.ok && res.character.className === state.meta.className) {
-    state.character = res.character;
+    state.character = withSource(res.character, mine);
     rememberCharacter(mine, res.character);
     invalidateThroughput();
     if (dom) renderAll();
@@ -380,6 +398,28 @@ function compareStats() {
   return { talent: total ? agree / total : 0, slots, popular };
 }
 
+/** Which talents of a SimulationCraft export to compare: the active ones or a saved loadout. */
+function loadoutSelect(c) {
+  const select = el('select.wow-select.small', { title: 'Talent loadout from your export' }, c.loadouts.map((name, i) => el('option', { value: String(i) }, name)));
+  select.value = String(c.loadout || 0);
+  select.addEventListener('change', () => switchLoadout(Number(select.value)));
+  return select;
+}
+
+async function switchLoadout(index) {
+  const c = state.character;
+  if (!c?.simc) return;
+  const res = await window.api.importSimc(c.simc, { loadout: index });
+  if (!res.ok) {
+    toast(res.error || 'Could not read that loadout');
+    return;
+  }
+  const who = { source: 'simc', simc: c.simc, loadout: index };
+  state.character = withSource(res.character, who);
+  rememberCharacter(who, res.character);
+  renderAll();
+}
+
 function compareBanner() {
   const c = state.character;
   const s = compareStats();
@@ -389,6 +429,8 @@ function compareBanner() {
     el('span.wow-header', 'Comparing'),
     el('span', { style: { color: state.meta.color } }, c.name),
     el('span.dim', `${c.realm} (${String(c.region).toUpperCase()}) · ${c.activeSpecName || ''} · ilvl ${c.itemLevel ? c.itemLevel.toFixed(1) : '?'}`),
+    c.source === 'simc' ? el('span.tag.simc', { title: 'From your SimulationCraft export' }, 'SimC') : null,
+    c.source === 'simc' && c.loadouts?.length > 1 ? loadoutSelect(c) : null,
     el('span', 'Talents match the majority: ', el('b', pct(s.talent))),
     el('span', 'Gear: ', el('b', `${s.popular}/${s.slots}`), ' slots use the most popular item'),
     wrongSpec ? el('span.warn', `⚠ Your active spec is ${c.activeSpecName}, so your talents won't match this tree`) : null,
@@ -576,7 +618,7 @@ async function openCompare() {
     onLoaded: (character, who, { apply = true } = {}) => {
       rememberCharacter(who, character);
       if (!apply) return;
-      state.character = character;
+      state.character = withSource(character, who);
       savePrefs({ compareActive: true });
       invalidateThroughput();
       renderAll();

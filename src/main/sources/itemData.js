@@ -30,7 +30,7 @@ const PRIMARY = {
 const STAMINA = 7;
 // Crafted items carry placeholder stats that become the stats chosen when crafting.
 const CRAFTED_STAT_SLOTS = [24, 25];
-const BONUS = { socket: 6, craftedStat: 25, limitCategory: 35 };
+const BONUS = { quality: 3, socket: 6, craftedStat: 25, limitCategory: 35 };
 const EMBELLISHED_LIMIT = 512; // "Unique-Equipped: Embellished (2)"
 
 // Stat budget column (RandPropPoints EpicF_n) and combat rating multiplier table by inventory type.
@@ -141,17 +141,21 @@ function getBonusLists(ids, opts) {
  * Stats of one item variant at item level `ilvl`: { primary: { name, value } | null, stamina,
  * secondary: { crit, haste, mastery, vers }, randomStats, sockets }. `randomStats` counts secondary
  * stats the item rolled when it dropped, which the data does not say.
- * `item` from getItems, `bonusRows` = the ItemBonus rows of its bonus IDs.
+ * `item` from getItems, `bonusRows` = the ItemBonus rows of its bonus IDs. `craftedStats` (stat
+ * ids, e.g. from a SimulationCraft export) are the stats actually chosen when crafting and win
+ * over the bonus IDs' choice.
  */
-function itemStats(item, bonusRows, ilvl, tables) {
+function itemStats(item, bonusRows, ilvl, tables, { craftedStats } = {}) {
   const budget = tables.budget[ilvl]?.[BUDGET_COLUMN[item.inventoryType] ?? 0] || 0;
   const mult = MULT_TABLE[item.inventoryType] ?? MULT.armor;
   const ratingMult = tables.ratingMult[mult]?.[ilvl - 1] ?? 1;
   const staminaMult = tables.staminaMult[mult]?.[ilvl - 1] ?? 1;
-  const chosen = bonusRows
-    .filter((b) => b.type === BONUS.craftedStat)
-    .sort((a, b) => a.order - b.order)
-    .map((b) => b.values[0]);
+  const chosen = craftedStats?.length
+    ? craftedStats
+    : bonusRows
+        .filter((b) => b.type === BONUS.craftedStat)
+        .sort((a, b) => a.order - b.order)
+        .map((b) => b.values[0]);
   const secondary = { crit: 0, haste: 0, mastery: 0, vers: 0 };
   let primary = null;
   let stamina = 0;
@@ -174,30 +178,40 @@ function isEmbellished(item, bonusRows) {
   return item.limitCategory === EMBELLISHED_LIMIT || bonusRows.some((b) => b.type === BONUS.limitCategory && b.values[0] === EMBELLISHED_LIMIT);
 }
 
+/** Item quality after its bonus IDs (upgrades can raise it), or null when no bonus sets one. */
+function bonusQuality(bonusRows) {
+  const q = bonusRows.find((b) => b.type === BONUS.quality);
+  return q ? q.values[0] : null;
+}
+
 /**
- * Stats and embellishment of item variants: variants = [{ key, id, bonuses, ilvl }] ->
- * { [key]: { stats, primary, stamina, sockets, embellished } } (missing items are left out).
+ * Stats and embellishment of item variants: variants = [{ key, id, bonuses, ilvl, craftedStats?,
+ * statsFrom? }] -> { [key]: { stats, primary, stamina, randomStats, sockets, embellished, quality } }
+ * (missing items are left out). `statsFrom` is another item whose stats this one keeps: items made
+ * by the catalyst keep the stats of the item they were made from.
  */
 async function describeVariants(variants, { signal } = {}) {
   if (!variants.length) return {};
   const [tables, items, bonuses] = await Promise.all([
     getScaleTables({ signal }),
-    getItems(variants.map((v) => v.id), { signal }),
+    getItems(variants.flatMap((v) => [v.id, v.statsFrom]), { signal }),
     getBonusLists(variants.flatMap((v) => v.bonuses || []), { signal }),
   ]);
   const out = {};
   for (const v of variants) {
-    const item = items[v.id];
-    if (!item) continue;
+    const own = items[v.id];
+    if (!own) continue;
+    const item = v.statsFrom && items[v.statsFrom] ? { ...own, stats: items[v.statsFrom].stats } : own;
     const rows = (v.bonuses || []).flatMap((b) => bonuses[b] || []);
-    const s = itemStats(item, rows, v.ilvl, tables);
+    const s = itemStats(item, rows, v.ilvl, tables, { craftedStats: v.craftedStats });
     out[v.key] = {
       stats: s.secondary,
       primary: s.primary,
       stamina: s.stamina,
       randomStats: s.randomStats,
       sockets: s.sockets,
-      embellished: isEmbellished(item, rows),
+      embellished: isEmbellished(own, rows),
+      quality: bonusQuality(rows),
     };
   }
   return out;

@@ -2230,3 +2230,38 @@ table.dev-table {
   pointer-events: none;
   z-index: 1001;
 }
+
+/* ------------------------------------------------------------------ SimulationCraft import */
+.tag.simc {
+  font-size: 10px;
+  padding: 0 4px;
+  margin-left: 6px;
+  color: #8fd3ff;
+  border: 1px solid #2e6d92;
+  border-radius: 3px;
+}
+.compare-modes {
+  align-self: flex-start;
+}
+textarea.wow-textarea {
+  width: 100%;
+  min-height: 130px;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  resize: vertical;
+  color: #fff;
+  background-color: #0b0a07;
+  border: 1px solid #6f5726;
+  border-radius: 3px;
+  font-family: Consolas, 'Cascadia Mono', monospace;
+  font-size: 12px;
+  box-shadow: inset 0 1px 3px #000;
+  outline: none;
+}
+textarea.wow-textarea:focus {
+  border-color: var(--gold);
+}
+.compare-banner select.wow-select.small {
+  height: 24px;
+  font-size: 12px;
+}

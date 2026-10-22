@@ -26,8 +26,8 @@ const LOCALES = [
 /** Item facts from the item XML (see itemInfo.parseItemXml); cached for a week. */
 async function getItemXml(id, { signal } = {}) {
   const url = `https://www.wowhead.com/item=${id}&xml`;
-  // v2: parsed with item type and boss (older cache entries only had the source).
-  return cache.cached('itemSource', `${url}|v2`, async () => {
+  // v3: parsed with item type, boss, name, quality, icon and set (older entries had less).
+  return cache.cached('itemSource', `${url}|v3`, async () => {
     try {
       return parseItemXml(await fetchText(url, { signal }));
     } catch (err) {

@@ -148,8 +148,23 @@ function snap(v) {
 }
 
 /**
+ * Every node of each game talent tree in ascending id order: the order in which an in-game talent
+ * export string lists the nodes (see loadout.js).
+ */
+function nodeOrderByTree(nodes) {
+  const byTree = new Map();
+  for (const [id, n] of nodes) {
+    if (!n.treeId) continue;
+    if (!byTree.has(n.treeId)) byTree.set(n.treeId, []);
+    byTree.get(n.treeId).push(id);
+  }
+  for (const list of byTree.values()) list.sort((a, b) => a - b);
+  return byTree;
+}
+
+/**
  * Per-spec trees in the app's format.
- * `nodes`: Map nodeId -> { posX, posY }; `edges`: [{ from, to }];
+ * `nodes`: Map nodeId -> { posX, posY, treeId }; `edges`: [{ from, to }];
  * `entryTypes`: Map entryId -> NodeEntryType (1 = square/active, 2 = circle/passive);
  * `definitions`: Map definitionId -> { overrideIcon, overrideName };
  * `spells`: Map spellId -> { iconFileId }; `icons`: Map fileId -> icon name;
@@ -174,10 +189,18 @@ function buildTrees({ traits, nodes, edges, entryTypes, definitions, spells, ico
     index: t.index,
   });
 
+  const order = nodeOrderByTree(nodes);
   const out = [];
   for (const spec of specs) {
     const mine = traitsOfSpec(traits, spec, nodes);
     if (!mine.some((t) => t.tree === TREE.spec)) continue;
+    // The class's game tree: the one its class and spec nodes belong to.
+    const treeCounts = new Map();
+    for (const t of mine) {
+      const treeId = t.tree <= TREE.spec ? nodes.get(t.nodeId)?.treeId : null;
+      if (treeId) treeCounts.set(treeId, (treeCounts.get(treeId) || 0) + 1);
+    }
+    const traitTreeId = [...treeCounts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
     const byNode = new Map();
     for (const t of mine) {
@@ -234,6 +257,8 @@ function buildTrees({ traits, nodes, edges, entryTypes, definitions, spells, ico
       classId: spec.classId,
       specName: spec.name,
       specId: spec.id,
+      traitTreeId,
+      fullNodeOrder: order.get(traitTreeId) || [],
       ...groups,
     });
   }
@@ -303,7 +328,7 @@ async function download({ signal } = {}) {
   const classIds = new Set(traits.map((t) => t.classId));
   return buildTrees({
     traits,
-    nodes: new Map(nodeRows.map((r) => [+r.ID, { posX: +r.PosX, posY: +r.PosY }])),
+    nodes: new Map(nodeRows.map((r) => [+r.ID, { posX: +r.PosX, posY: +r.PosY, treeId: +r.TraitTreeID }])),
     edges: edgeRows.map((r) => ({ from: +r.LeftTraitNodeID, to: +r.RightTraitNodeID })),
     entryTypes: new Map(entryRows.map((r) => [+r.ID, +r.NodeEntryType])),
     definitions,
@@ -319,7 +344,7 @@ async function download({ signal } = {}) {
   });
 }
 
-const CACHE_KEY = 'trees-v1';
+const CACHE_KEY = 'trees-v2'; // v2: traitTreeId + fullNodeOrder
 let inMemory = null;
 
 /**

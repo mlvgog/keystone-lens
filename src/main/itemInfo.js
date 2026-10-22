@@ -60,11 +60,17 @@ function htmlLines(html) {
 
 /**
  * Wowhead's documented item XML (www.wowhead.com/item=ID&xml, English):
- * { source: [codes], more: [...], slot, slotType, droppedBy }.
+ * { source: [codes], more: [...], slot, slotType, droppedBy, name, quality, icon, itemSet }.
  */
 function parseItemXml(xml) {
   const text = String(xml || '');
-  const out = { source: [], more: [], slot: null, slotType: null, droppedBy: null };
+  const out = { source: [], more: [], slot: null, slotType: null, droppedBy: null, name: null, quality: null, icon: null, itemSet: null };
+  out.name = /<name><!\[CDATA\[([\s\S]*?)\]\]><\/name>/.exec(text)?.[1] ?? null;
+  const quality = /<quality id="(\d+)"/.exec(text);
+  out.quality = quality ? Number(quality[1]) : null;
+  out.icon = /<icon[^>]*>([^<]+)<\/icon>/.exec(text)?.[1].trim().toLowerCase() || null;
+  const itemSet = /<jsonEquip><!\[CDATA\[[\s\S]*?"itemset":(\d+)/.exec(text);
+  out.itemSet = itemSet ? Number(itemSet[1]) : null;
   const json = /<json><!\[CDATA\[([\s\S]*?)\]\]><\/json>/.exec(text);
   if (json) {
     try {
@@ -77,8 +83,9 @@ function parseItemXml(xml) {
     }
   }
   const tooltip = /<htmlTooltip><!\[CDATA\[([\s\S]*?)\]\]><\/htmlTooltip>/.exec(text)?.[1] || '';
-  const slotRow = /<table width="100%"><tr><td>([\s\S]*?)<\/td><th>([\s\S]*?)<\/th>/.exec(tooltip);
-  if (slotRow) out.slotType = htmlLines(`${slotRow[1]} ${slotRow[2]}`).join(' ') || null;
+  // "Head | Leather", or just "Back" for cloaks, necks and rings.
+  const slotRow = /<table width="100%"><tr><td>([\s\S]*?)<\/td>(?:<th>([\s\S]*?)<\/th>)?/.exec(tooltip);
+  if (slotRow) out.slotType = htmlLines(`${slotRow[1]} ${slotRow[2] || ''}`).join(' ') || null;
   const boss = /Dropped by:\s*([^<]+)</i.exec(tooltip);
   out.droppedBy = boss ? decodeEntities(boss[1]).trim() : null;
   return out;

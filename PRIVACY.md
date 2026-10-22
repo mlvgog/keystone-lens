@@ -13,6 +13,7 @@ Everything is stored in `%APPDATA%\Keystone Lens`. Nothing is uploaded.
 | Settings: language, default region, player count | `settings.json` | |
 | Your Warcraft Logs client ID and secret (optional) | `settings.json` | The secret is encrypted with Windows' per-user encryption (DPAPI) and can't be read by other Windows accounts. |
 | Characters you load in "Compare with my character" (region, realm, name, class) | the app's local storage | Up to 12, so you can load them again with one click. |
+| SimulationCraft exports you paste | the app's local storage | Kept with the saved character so it can be loaded again without pasting. They contain your character's name, realm, talents and gear. Never sent anywhere; only the item IDs in it are looked up as described below. |
 | Cached public data from raider.io, Wowhead, wago.tools and SimulationCraft | `data-cache` | Clear it in ⚙ Settings → Clear cache. |
 | Trend history (pick rates of earlier searches) | `history` | |
 | Download statistics for the developer menu | `stats.json` | Request counts and sizes per source. |

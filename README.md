@@ -51,9 +51,12 @@ Get the latest version from the [**Releases**](https://github.com/mlvgog/keyston
 
 ### Compare with my character
 
-- **Your build on the tree.** Load your character and your talents are overlaid on the tree: ✔ marks your picks, a red ring a popular talent you skip, and an orange ring an unusual pick.
-- **Your gear.** Each gear slot shows your item and how popular it is.
-- **Saved characters.** Realm names autocomplete. Characters you load are remembered.
+- **Two ways to load your character.** Look it up on raider.io, or paste the export of the [SimulationCraft addon](https://www.curseforge.com/wow/addons/simulationcraft) (type `/simc` in game and copy the text).
+  - **What the export adds.** It shows exactly what you have on right now, including the stats you chose when crafting and the stats catalysed items keep from the original item.
+  - **Saved loadouts.** The talent loadouts saved in the export can be compared too: pick one in the compare bar.
+- **Your build on the tree.** Your talents are overlaid on the tree: ✔ marks your picks, a red ring a popular talent you skip, and an orange ring an unusual pick.
+- **Your gear.** Each gear slot shows your item and how popular it is. Hover your item for its tooltip.
+- **Saved characters.** Realm names autocomplete. Characters you load are remembered, SimulationCraft imports included.
 
 ### Damage (Warcraft Logs, optional)
 
@@ -155,6 +158,7 @@ Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md).
 | `src/main/collector.js` | Builds an analysis (raw per-player data) and loads dungeons on demand |
 | `src/main/discovery.js` | Finds a spec's players in raider.io's top keys |
 | `src/main/selection.js` | Which key represents a player |
+| `src/main/simc.js`, `loadout.js`, `simcImport.js` | SimulationCraft export parsing, in-game talent string decoding, and your character from an export |
 | `src/main/views.js` | Filtered statistics for the UI (hero tree, dungeon, build, trends) |
 | `src/main/aggregate.js`, `builds.js`, `gearSummary.js`, `itemInfo.js` | Talent and gear counting, build clustering, stat profile, item source parsing |
 | `src/main/throughput.js` | Damage and healing statistics |

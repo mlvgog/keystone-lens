@@ -67,3 +67,33 @@ test('SimulationCraft tables are read with comments stripped', () => {
   const text = 'static constexpr double __x[][3] = {\n  // Armor\n  {\n    1.5,\t1.25,\t2,\t//    3\n  },\n  {\n    3, 4, 5,\n  },\n};';
   assert.deepEqual(parseSimcTable(text, '__x'), [[1.5, 1.25, 2], [3, 4, 5]]);
 });
+
+test('crafted stats from a SimulationCraft export win over the bonus IDs', () => {
+  const cloak = { inventoryType: 16, limitCategory: 0, sockets: 0, stats: [[71, 5259], [7, 7889], [24, 3500], [25, 3500]] };
+  const bonuses = [
+    { type: 25, values: [49, 100, 0, 0], order: 0 },
+    { type: 25, values: [36, 100, 0, 0], order: 1 },
+  ];
+  assert.deepEqual(itemStats(cloak, bonuses, 331, TABLES, { craftedStats: [40, 49] }).secondary, { crit: 0, haste: 0, mastery: 56, vers: 56 });
+});
+
+test('catalysed items keep the stats of the item they were made from', async () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const cache = require('../src/main/cache');
+  const { describeVariants } = require('../src/main/sources/itemData');
+  cache.init(fs.mkdtempSync(path.join(os.tmpdir(), 'kl-items-')));
+  await cache.write('gameTables', 'item-scaling-v1', TABLES);
+  // Chosen Bloodslayer's Spirit Shroud (Mastery/Crit) made from Spare Speaker's Hood (Haste/Crit).
+  await cache.write('itemData', '271510', { inventoryType: 1, limitCategory: 0, sockets: 0, stats: [[73, 5259], [7, 7889], [49, 4667], [32, 2333]] });
+  await cache.write('itemData', '273791', { inventoryType: 1, limitCategory: 0, sockets: 0, stats: [[73, 5259], [7, 7889], [36, 4000], [32, 3000]] });
+  await cache.write('itemBonus', '12854', [{ type: 3, values: [4, 0, 0, 0], order: 1 }]);
+  const out = await describeVariants([
+    { key: 'catalysed', id: 271510, bonuses: [12854], ilvl: 344, statsFrom: 273791 },
+    { key: 'plain', id: 271510, bonuses: [12854], ilvl: 344 },
+  ]);
+  assert.deepEqual(out.catalysed.stats, { crit: 90, haste: 119, mastery: 0, vers: 0 });
+  assert.deepEqual(out.plain.stats, { crit: 70, haste: 0, mastery: 139, vers: 0 });
+  assert.equal(out.catalysed.quality, 4);
+});
