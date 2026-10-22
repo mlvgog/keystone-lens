@@ -1,152 +1,169 @@
-# M+ Talent & Gear Inspector
+# Keystone Lens
 
-A Windows desktop app, styled like a WoW addon, that shows what the top Mythic+ players of a retail spec are running.
+**See what the best Mythic+ players of your spec actually run.** Keystone Lens is a free Windows app, styled like a World of Warcraft addon, that shows the talents, builds, gear and damage of the top M+ players of any retail spec:
+
+- talent pick rates on an in-game-style talent tree;
+- popular builds with copyable import strings;
+- gear usage per slot, with stats, enchants, gems and where each item drops;
+- damage and healing per dungeon from Warcraft Logs, compared with your own runs.
+
+![Talent tree with pick rates for the top 50 Subtlety Rogues](docs/screenshots/talents.jpg)
+
+## Download
+
+Get the latest version from the [**Releases**](https://github.com/mlvgog/keystone-lens/releases) page:
+
+| File | What it is |
+|---|---|
+| `KeystoneLens-Setup-<version>.exe` | **Installer (recommended).** Adds Start menu and desktop shortcuts and an uninstaller. Installs for your user only, so no admin rights are needed. |
+| `KeystoneLens-Portable-<version>.exe` | A single exe you can run from anywhere, no install. |
+| `SHA256SUMS.txt` | Checksums to verify the download. |
+
+**Windows SmartScreen.** The exe is not code-signed yet, so Windows may show "Windows protected your PC". Click **More info → Run anyway**. Releases are built from this repository by [GitHub Actions](.github/workflows/release.yml). You can compare the file's SHA-256 (`certutil -hashfile KeystoneLens-Setup-<version>.exe SHA256`) with `SHA256SUMS.txt`, or build it yourself (see below).
 
 ## Features
 
 ### Talents
-- The class, hero and spec trees are laid out like the in-game talent frame.
-- Every node shows the % of players who picked it.
-- Choice nodes show "left | right" percentages.
-- Multi-rank and apex nodes show their most common rank.
-- Hover a node for the full breakdown and the spell description.
 
-### Popular builds
-- Players running nearly the same build are grouped together, for example "Build 1 · Frostfire · 12 players".
-- Each build lists what makes it different, and has a **Copy** button for its in-game import string.
-- Click a build to show only its players. Nodes where the build differs from the majority get a dashed cyan ring.
-
-### Filters
-These sit under the title and apply to every tab.
-- **Dungeon:** each player's best key in one dungeon. A dungeon is loaded the first time you pick it.
-- **Hero tree:** only players on one hero tree.
-- **Trends:** pick-rate changes compared with an earlier run of the same search, shown as ▲/▼ on talents and items plus a "Biggest changes" card.
+- **Talent tree.** The class, hero and spec trees are laid out like the in-game talent frame. Every node shows the % of players who picked it. Choice nodes show "left | right", and multi-rank nodes show their most common rank.
+- **Popular builds.** Players with nearly the same build are grouped, for example "Build 1 · Trickster · 35 players". Each build shows how it differs from the majority, and has a **Copy** button for its in-game import string.
+- **Export.** Save or copy the tree as an image, for example to post on Discord.
 
 ### Gear
-- For every slot: the items used and how many players use each one ("Item (49)").
-- Each item shows its stats, upgrade track, effects, enchant and gem usage, and **where it drops** (M+ dungeon, raid, crafted plus profession, tier).
-- Hover an item for its full in-game-style tooltip, with a side box of who uses it.
-- Rings and trinkets are combined, counted once per player.
-- **Overview cards:**
-  - the secondary-stat profile from gear and gems
-  - the top enchant per slot
-  - gems and embellishments
-  - tier usage per slot
-  - weapon setups
+
+![Gear overview with stat profile, enchants, gems and per-slot item usage](docs/screenshots/gear.jpg)
+
+- **Items per slot.** Every slot lists the items used and how many players use each one, with the item's stats, upgrade track, effects, enchants and gems. It also shows **where the item drops**: M+ dungeon, raid boss, crafted or tier. Rings and trinkets are combined.
+- **Overview.** Secondary-stat profile, top enchant per slot, gems and embellishments, tier pieces and weapon setups.
 
 ### Players
-- The ranked players and the key their data comes from.
-- Sortable columns, search, region and minimum-key-level filters.
-- **Copy build**, plus raider.io / Warcraft Logs / Armory links.
-- Click a row to **inspect** that player: their own talent tree and gear.
+
+![Players table with scores, keys and builds](docs/screenshots/players.jpg)
+
+- **Player list.** Every sampled player with their score, the key their data comes from, hero tree, build and item level. The list is sortable and searchable, with region and key-level filters. Each player has **Copy build** and links to raider.io, Warcraft Logs and the Armory.
+- **Inspect.** Click a player to see their own talent tree and gear.
+
+### Filters
+
+- **Dungeon.** Each player's best key in one dungeon.
+- **Hero tree.** Only players of one hero tree.
+- **Trends.** Pick-rate changes since an earlier run of the same search.
 
 ### Compare with my character
-- Enter your region, realm and name. The realm field suggests realm names as you type (all realms of the region, including Korean and Chinese names).
-- Characters you load are remembered: click one to load it again, or start typing its name. While comparing, opening another spec automatically loads your most recently used character of that class.
-- Your talents are overlaid on the tree:
-  - ✔ marks your picks.
-  - A red ring marks a popular talent you skip.
-  - An orange ring marks an unusual pick.
-- Each gear slot shows your item and how popular it is.
 
-### Damage (Warcraft Logs)
-- Median **DPS** (or **HPS** for healing) of the spec in each dungeon, per key level, from logged keys on Warcraft Logs. Hover a cell for the average, the middle half of runs, the range, run time and how many runs it is based on. Cells with fewer than 5 runs are greyed out.
-- **Columns by item level** instead of key level: the same numbers grouped by the players' equipped item level (needs each run's gear, so it downloads much more).
-- **Your own runs** (when "Compare with my character" is on): every logged key of yours in the selected range, with the spec median at the same key level, the difference in %, and the share of other logged runs you beat. Your best run per key level also shows inside the table. Links open the log on Warcraft Logs.
-- Numbers are per second over the whole key, like Details' "overall" segment. Per dungeon and key level, Warcraft Logs ranks up to 100 of the best-timed logged runs; players who log tend to be above average.
+- **Your build on the tree.** Load your character and your talents are overlaid on the tree: ✔ marks your picks, a red ring a popular talent you skip, and an orange ring an unusual pick.
+- **Your gear.** Each gear slot shows your item and how popular it is.
+- **Saved characters.** Realm names autocomplete. Characters you load are remembered.
 
-**Setup:** this needs your own free Warcraft Logs API client.
-1. Sign in at warcraftlogs.com and open https://www.warcraftlogs.com/api/clients/.
-2. Create a client (any name, redirect URL `http://localhost`, *not* a public client).
-3. Paste the client ID and secret into ⚙ Settings → Warcraft Logs and press **Save & test**. They are stored only on your PC.
+### Damage (Warcraft Logs, optional)
 
-Warcraft Logs limits lookups per hour for each API key. Each key level in the range costs one lookup per dungeon, the item-level view costs a lot more, and everything loaded is cached for a day. If the limit is reached, the tab tells you when it resets.
+- **Spec median per dungeon.** The median **DPS** (or **HPS**) of the spec in each dungeon, by key level or by item level, from logged keys on Warcraft Logs.
+- **Your runs compared.** With "Compare with my character" on, every logged key of yours shows next to the spec median at the same level.
 
 ### Other
-- **Export:** save or copy the talent tree as an image, for example for Discord.
-- **Settings (⚙):** tooltip language (9 languages), default region and player count, cache size and clear cache.
-- **Reopening:** the app reopens your last results instantly. Recent searches show on the class picker.
-- **Developer menu** (Settings → Developer…, or **Ctrl+Shift+D**): how much data was downloaded from each source, this session and all time (raider.io, Wowhead, raidbots, icon CDNs). It also shows request counts, average response time, errors, what is cached on disk per data type with hit rates, and a live list of the latest requests. Buttons: open DevTools, open the data folder, reset counters, clear cache.
 
-## Running it
+- **Settings (⚙).** Tooltip language (9 languages), default region and player count.
+- **Reopen last results.** The app reopens your last results instantly.
+- **Developer menu (Ctrl+Shift+D).** Download statistics per data source.
 
-Requires [Node.js](https://nodejs.org) (v20+).
+## Setting up the Damage tab
+
+The Damage tab uses the Warcraft Logs API, which needs your own free API client. Warcraft Logs does not allow API keys to be shipped inside open-source apps.
+
+1. Sign in at [warcraftlogs.com](https://www.warcraftlogs.com) and open <https://www.warcraftlogs.com/api/clients/>.
+2. Click **Create Client** and give it a **descriptive name**, for example `Keystone Lens - <your name>`. Warcraft Logs may remove clients whose purpose isn't clear. Use `http://localhost` as the redirect URL and leave **Public Client** unchecked.
+3. In Keystone Lens, open **⚙ Settings → Warcraft Logs**, paste the client ID and secret, and press **Save & test**.
+
+The secret is stored only on your PC, encrypted for your Windows account, and is only ever sent to warcraftlogs.com.
+
+**Usage limit.** Warcraft Logs limits how much each API client can look up per hour. Each key level in the range costs one lookup per dungeon, and the item-level view costs much more. If you hit the limit, the tab tells you when it resets.
+
+## How players are chosen
+
+1. **Finding players.** The app reads raider.io's published list of the season's top keys, dungeon by dungeon. It collects everyone who played the spec in those keys, then ranks them by their Mythic+ score for that spec. The top N are used (default 50, region World).
+2. **Which key represents a player.** raider.io stores a snapshot of each player's talents and gear for every key they ran. The app uses each player's **highest-scoring key on the current patch**. The current patch is the newest game version in the snapshots, for example `12.1.0`. If a player has no key on the current patch, their best key overall is used, and they are marked "older patch".
+3. **Tuning hotfixes.** Hotfixes don't change the game version. Choose **Keys since date…** to count only keys played after a hotfix.
+4. **Skipped players.** Players with private profiles or no usable key are skipped, and the next player by score is used instead.
+5. **Rare specs.** raider.io's public top-keys list covers the 2,000 best keys per dungeon. Very rarely played specs may have fewer players than requested. The header then shows, for example, "Top 7 of 50".
+
+**How long it takes.** A first search usually takes 1–2 minutes. For a rare spec, reading all the top keys can take about 5 minutes the first time. Those pages are shared by every spec and kept for 6 hours, so later searches are much faster.
+
+**Caching.**
+
+| Data | Kept for |
+|---|---|
+| Finished analyses (reopened instantly, **Refresh** re-fetches) | 1 hour |
+| Top-keys pages | 6 hours |
+| Player scores and key history | 1 hour |
+| Key snapshots (talents and gear per key) | forever, because they never change |
+| Item and spell tooltips, item sources | 7 days |
+| Talent trees | 1 day |
+| Warcraft Logs data | 30 minutes, in memory only, never on disk |
+
+Everything lives in `%APPDATA%\Keystone Lens`:
+- `data-cache` holds the cache, which you can clear in Settings;
+- `history` holds trend snapshots;
+- `settings.json` holds your settings;
+- `stats.json` holds the developer-menu totals.
+
+## Data sources
+
+Keystone Lens has no server of its own. Your PC talks to these services directly:
+
+| Source | Used for |
+|---|---|
+| [raider.io](https://raider.io) | Top keys, players' scores and key history, talent and gear snapshots per key, your character, dungeon, raid and realm lists. Uses the [public API](https://raider.io/api). |
+| [Wowhead](https://www.wowhead.com) | Item stats for the exact item variant, talent descriptions, item sources, icons. |
+| [raidbots](https://www.raidbots.com) | Talent tree layout. |
+| [Warcraft Logs](https://www.warcraftlogs.com) | Damage and healing per dungeon, and your logged runs. Optional, with your own API client. |
+
+Thanks to all of them for the data that makes this possible. Please respect their terms if you build on this project.
+
+## Privacy
+
+Keystone Lens has no accounts, no analytics and no telemetry. Everything it stores stays on your PC. See [PRIVACY.md](PRIVACY.md) for exactly what is stored and sent where.
+
+## Building from source
+
+Requires [Node.js](https://nodejs.org) 20 or newer.
 
 ```bat
 start.bat
 ```
 
-`start.bat` installs the dependencies on first run, then launches the app. You can also run `npm install` and then `npm start`.
+`start.bat` installs the dependencies on first run and launches the app. You can also run `npm install`, then `npm start`.
 
-### Portable .exe
-
-```bat
-npm run dist
-```
-
-This builds `dist\MPlusTalentGearInspector-portable.exe`, a single file you can copy anywhere and double-click.
-
-## How the data is chosen
-
-1. **Who is sampled.** The top N players of the spec (default 50, region World by default) come from the raider.io character rankings for the current season.
-2. **Where the data comes from.** For each player the app gathers their best key per dungeon and their 10 most recent keys. Raider.io stores a **snapshot of the player's talents and gear for every key** they ran.
-3. **Which key is used.** The **current patch** is the newest game version seen in those snapshots (e.g. `12.1.0`). Each player is represented by their **highest-scoring key played on the current patch**.
-   - If they have none on the current patch, their best key overall is used instead, and they are marked "older patch".
-   - In the dungeon filter, the same rule is applied to each player's keys in that dungeon.
-4. **Tuning hotfixes.** Mid-patch tuning hotfixes don't change the game version. To count only keys played after a hotfix, choose **"Keys since date…"** and pick the hotfix date.
-5. **Skipped players.** Players with private or anonymised profiles, or without a key on this spec, are skipped. The next ranked player is used instead.
-
-A cold run makes roughly 150–450 requests and usually takes 40 seconds to 3 minutes, depending on raider.io. Results are cached:
-
-| Data | Cached for |
+| Command | What it does |
 |---|---|
-| Analyses (reopened instantly; **Refresh** fetches new data) | 1 hour |
-| Key snapshots | forever (they never change) |
-| Item and spell tooltips, item sources | 7 days |
-| Talent trees | 1 day |
+| `npm test` | Unit tests (`node:test`) |
+| `npm run dist` | Installer and portable exe in `dist\` |
+| `npm run dist:installer` / `npm run dist:portable` | Only one of them |
+| `npm run icon` | Regenerates `src/assets/icon.png` |
 
-The cache lives in `%APPDATA%\M+ Talent & Gear Inspector\data-cache`, and you can clear it in Settings. Trend history is stored in `...\history`, settings in `...\settings.json`, and the developer-menu totals in `...\stats.json`.
+Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md).
 
-## Data sources
-
-All public, no API key needed:
-
-- [raider.io](https://raider.io): rankings, key history, talent and gear snapshots per key, your character, dungeon and raid lists.
-- [raidbots](https://www.raidbots.com/static/data/live/talents.json): talent tree layout (positions, connections, icons).
-- [Wowhead](https://www.wowhead.com): item stats for the exact item variant (bonus IDs and item level), talent descriptions, and item sources.
-- [Warcraft Logs](https://www.warcraftlogs.com) (optional, with your own API client): damage and healing per dungeon and key level, and your own logged runs.
-
-## Optional: the in-game font
-
-Copy `FRIZQT__.TTF` (WoW's UI font) into `src/renderer/fonts/` to have headings use it. Without it, the bundled Marcellus font is used.
-
-## Development
-
-```bat
-npm test
-```
-
-`npm test` runs the unit tests (`node:test`).
-
-```bat
-npm run icon
-```
-
-`npm run icon` regenerates `src/assets/icon.png`.
+**Optional font.** If you have WoW installed, you can copy its UI font `FRIZQT__.TTF` into `src/renderer/fonts/` for in-game-style headings when running from source. The font belongs to Blizzard, so it is not included. Without it, the bundled Marcellus font is used.
 
 | File | Purpose |
 |---|---|
-| `src/main/collector.js` | Builds an analysis "session" (raw per-player data) and loads dungeons on demand |
-| `src/main/views.js` | Filtered statistics for the UI (hero / dungeon / build / trends) |
+| `src/main/collector.js` | Builds an analysis (raw per-player data) and loads dungeons on demand |
+| `src/main/discovery.js` | Finds a spec's players in raider.io's top keys |
 | `src/main/selection.js` | Which key represents a player |
-| `src/main/aggregate.js` | Talent and gear counting |
-| `src/main/builds.js` | Popular builds (clustering) |
-| `src/main/gearSummary.js` | Stat profile, enchants, gems, embellishments |
-| `src/main/itemInfo.js` | Stats and source parsing |
-| `src/main/history.js` | Trend snapshots |
-| `src/main/settings.js` | Settings |
-| `src/main/stats.js` | Download and cache statistics for the developer menu |
-| `src/main/throughput.js` | Damage / healing statistics (medians per dungeon and key or item level, your runs vs the spec) |
-| `src/main/sources/wcl.js` | Warcraft Logs client (OAuth client credentials, GraphQL, rankings) |
-| `src/main/sources/` | raider.io / raidbots / Wowhead clients (rate limited, retried, cached) |
-| `src/renderer/` | UI (plain HTML/CSS/ES modules) |
+| `src/main/views.js` | Filtered statistics for the UI (hero tree, dungeon, build, trends) |
+| `src/main/aggregate.js`, `builds.js`, `gearSummary.js`, `itemInfo.js` | Talent and gear counting, build clustering, stat profile, stat and source parsing |
+| `src/main/throughput.js` | Damage and healing statistics |
+| `src/main/history.js`, `settings.js`, `stats.js`, `cache.js` | Trend snapshots, settings, download statistics, cache |
+| `src/main/sources/` | raider.io, raidbots, Wowhead and Warcraft Logs clients |
+| `src/renderer/` | UI (plain HTML, CSS and ES modules) |
+
+## Contributing
+
+Bug reports and ideas are welcome in [Issues](https://github.com/mlvgog/keystone-lens/issues). When reporting a bug, include your version (⚙ Settings → About), the spec and the tab. Never post your Warcraft Logs client secret.
+
+## Disclaimer
+
+Keystone Lens is a free, non-commercial fan project. It is not affiliated with or endorsed by Blizzard Entertainment, raider.io, Wowhead, raidbots or Warcraft Logs. World of Warcraft and Warcraft are trademarks or registered trademarks of Blizzard Entertainment, Inc. in the U.S. and/or other countries. Game data and icons belong to their respective owners.
+
+## License
+
+[MIT](LICENSE.txt) © 2026 Gog

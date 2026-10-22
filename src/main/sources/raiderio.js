@@ -73,58 +73,86 @@ async function getRaids(expansionId, { signal } = {}) {
   }
 }
 
-/** One page (100 players) of the raider.io character rankings for a spec. */
-async function getSpecRankings({ season, region, classSlug, specSlug, page }, { signal, force } = {}) {
-  const url =
-    `${BASE}/api/mythic-plus/rankings/specs?region=${encodeURIComponent(region)}` +
-    `&season=${encodeURIComponent(season)}&class=${encodeURIComponent(classSlug)}` +
-    `&spec=${encodeURIComponent(specSlug)}&page=${page}`;
-  return cache.cached('rankings', url, async () => {
-    const data = await fetchJson(url, { signal });
-    const ranked = data?.rankings?.rankedCharacters || [];
-    return {
-      lastPage: data?.rankings?.ui?.lastPage ?? 0,
-      players: ranked.map((r) => ({
-        rank: r.rank,
-        score: r.score,
-        scoreColor: r.scoreColor,
-        characterId: r.character.id,
-        name: r.character.name,
-        classSlug: r.character.class?.slug,
-        realm: r.character.realm?.name,
-        realmSlug: r.character.realm?.slug,
-        region: r.character.region?.slug,
-        runs: (r.runs || []).map((run) => ({
-          id: run.keystoneRunId,
-          zoneId: run.zoneId,
-          level: run.mythicLevel,
-          score: run.score,
-          period: run.period,
+/** raider.io serves this many pages (of 20 runs) per top-runs list without an access key. */
+const TOP_RUN_PAGES = 100;
+
+/** Runs of the published top-runs list, with the roster of each run. */
+function parseTopRuns(json) {
+  return (json?.rankings || [])
+    .filter((r) => r?.run?.keystone_run_id)
+    .map((r) => ({
+      id: r.run.keystone_run_id,
+      zoneId: r.run.dungeon?.id ?? null,
+      level: r.run.mythic_level,
+      score: r.score ?? null,
+      completedAt: r.run.completed_at || null,
+      roster: (r.run.roster || [])
+        .filter((m) => m?.character?.id)
+        .map((m) => ({
+          characterId: m.character.id,
+          name: m.character.name,
+          classSlug: m.character.class?.slug || null,
+          specId: m.character.spec?.id ?? null,
+          realm: m.character.realm?.name || null,
+          realmSlug: m.character.realm?.slug || null,
+          region: m.character.region?.slug || null,
         })),
-      })),
-    };
+    }));
+}
+
+/** One page (20 runs) of the season's top keys in one dungeon; [] past the last page. */
+async function getTopRuns({ season, region, dungeon, page }, { signal, force } = {}) {
+  if (page >= TOP_RUN_PAGES) return [];
+  const url =
+    `${BASE}/api/v1/mythic-plus/runs?season=${encodeURIComponent(season)}` +
+    `&region=${encodeURIComponent(region)}&dungeon=${encodeURIComponent(dungeon)}&page=${page}`;
+  return cache.cached('rankings', url, async () => {
+    try {
+      return parseTopRuns(await fetchJson(url, { signal }));
+    } catch (err) {
+      if (err.status === 400) return [];
+      throw err;
+    }
   }, { force });
 }
 
-/** The character's 10 most recent keys (any spec). */
-async function getRecentRuns({ region, realmSlug, name }, { signal, force } = {}) {
+/** Season scores, best key per dungeon and the 10 most recent keys from a character profile. */
+function parseMythicPlusProfile(json) {
+  const run = (r) => ({
+    id: r.keystone_run_id,
+    zoneId: r.zone_id ?? null,
+    level: r.mythic_level,
+    score: r.score,
+    completedAt: r.completed_at || null,
+  });
+  return {
+    segments: json?.mythic_plus_scores_by_season?.[0]?.segments || {},
+    bestRuns: (json?.mythic_plus_best_runs || []).filter((r) => r?.keystone_run_id).map(run),
+    recentRuns: (json?.mythic_plus_recent_runs || []).filter((r) => r?.keystone_run_id).map(run),
+  };
+}
+
+/**
+ * Score and colour of one spec. raider.io numbers a class's specs spec_0..spec_3 in ascending
+ * spec id order (Holy, Protection, Retribution).
+ */
+function specScore(segments, specIndex) {
+  const s = specIndex >= 0 ? segments?.[`spec_${specIndex}`] : null;
+  return { score: s?.score || 0, color: s?.color || null };
+}
+
+/** A character's Mythic+ profile (see parseMythicPlusProfile), or null when raider.io does not know it. */
+async function getMythicPlusProfile({ region, realmSlug, name }, { signal, force } = {}) {
   const url =
     `${BASE}/api/v1/characters/profile?region=${encodeURIComponent(region)}` +
     `&realm=${encodeURIComponent(realmSlug)}&name=${encodeURIComponent(name)}` +
-    `&fields=mythic_plus_recent_runs`;
+    `&fields=mythic_plus_scores_by_season:current,mythic_plus_best_runs,mythic_plus_recent_runs`;
   return cache.cached('profile', url, async () => {
     try {
-      const data = await fetchJson(url, { signal });
-      return (data.mythic_plus_recent_runs || []).map((r) => ({
-        id: r.keystone_run_id,
-        zoneId: r.zone_id,
-        level: r.mythic_level,
-        score: r.score,
-        completedAt: r.completed_at,
-      }));
+      return parseMythicPlusProfile(await fetchJson(url, { signal }));
     } catch (err) {
-      // Missing/renamed characters are not fatal: we still have their ranked runs.
-      if (err.status === 400 || err.status === 404) return [];
+      // Missing/renamed characters are not fatal: we still have the key they were found in.
+      if (err.status === 400 || err.status === 404) return { segments: {}, bestRuns: [], recentRuns: [], missing: true };
       throw err;
     }
   }, { force });
@@ -264,8 +292,12 @@ module.exports = {
   getRaids,
   getRealms,
   parseRealmListing,
-  getSpecRankings,
-  getRecentRuns,
+  TOP_RUN_PAGES,
+  getTopRuns,
+  parseTopRuns,
+  getMythicPlusProfile,
+  parseMythicPlusProfile,
+  specScore,
   getRunDetails,
   getCharacter,
   slugifyRealm,

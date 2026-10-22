@@ -5,20 +5,30 @@ const path = require('path');
 const crypto = require('crypto');
 const stats = require('./stats');
 
-const HOUR = 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-/** Time-to-live per cache kind. Run snapshots never change, so they never expire. */
+/**
+ * Kinds that are kept in memory only, never on disk: Warcraft Logs answers with
+ * "Cache-Control: no-cache, private" and its API terms forbid keeping longer copies.
+ */
+const MEMORY_ONLY = new Set(['wclZone', 'wclRankings', 'wclCharacter']);
+
+/**
+ * Time-to-live per cache kind. Run snapshots never change, so they never expire. Top-runs
+ * pages ("rankings") are the same for every spec, so later searches of any spec reuse them.
+ */
 const TTL = {
   talents: DAY,
   season: 12 * HOUR,
-  rankings: HOUR,
+  rankings: 6 * HOUR,
   profile: HOUR,
   character: HOUR,
   realms: 7 * DAY,
-  wclZone: 12 * HOUR,
-  wclRankings: DAY,
-  wclCharacter: HOUR,
+  wclZone: 30 * MINUTE,
+  wclRankings: 30 * MINUTE,
+  wclCharacter: 30 * MINUTE,
   run: Infinity,
   itemTooltip: 7 * DAY,
   itemSource: 7 * DAY,
@@ -37,6 +47,14 @@ function init(baseDir) {
   cacheDir = path.join(baseDir, DIR_NAME);
   fs.mkdirSync(cacheDir, { recursive: true });
   migrateLegacy(path.join(baseDir, LEGACY_DIR_NAME));
+  // Earlier versions stored Warcraft Logs data on disk.
+  for (const kind of MEMORY_ONLY) {
+    try {
+      fs.rmSync(path.join(cacheDir, kind), { recursive: true, force: true });
+    } catch {
+      // retried on the next start
+    }
+  }
 }
 
 /** Move our data out of the folder shared with Chromium's cache (older versions used it). */
@@ -72,7 +90,7 @@ async function lookup(kind, key, { ignoreTtl = false, withTime = false }) {
   const memKey = `${kind}:${key}`;
   const hit = memory.get(memKey);
   if (hit && (ttl === Infinity || Date.now() - hit.at < ttl)) return withTime ? hit : hit.value;
-  if (!cacheDir) return undefined;
+  if (!cacheDir || MEMORY_ONLY.has(kind)) return undefined;
   const file = fileFor(kind, key);
   try {
     const stat = await fs.promises.stat(file);
@@ -88,7 +106,7 @@ async function lookup(kind, key, { ignoreTtl = false, withTime = false }) {
 
 async function write(kind, key, value) {
   memory.set(`${kind}:${key}`, { at: Date.now(), value });
-  if (!cacheDir) return;
+  if (!cacheDir || MEMORY_ONLY.has(kind)) return;
   const file = fileFor(kind, key);
   try {
     await fs.promises.mkdir(path.dirname(file), { recursive: true });
@@ -168,4 +186,4 @@ async function clear() {
   await fs.promises.mkdir(cacheDir, { recursive: true });
 }
 
-module.exports = { init, read, write, cached, info, infoByKind, dirSize, clear, TTL };
+module.exports = { init, read, write, cached, info, infoByKind, dirSize, clear, TTL, MEMORY_ONLY };

@@ -2,7 +2,39 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, BrowserWindow, ipcMain, shell, clipboard, dialog, ClipboardItem, session: electronSession } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, clipboard, dialog, ClipboardItem, safeStorage, session: electronSession } = require('electron');
+
+// The app was called "M+ Talent & Gear Inspector" before; move its data (cache, settings,
+// history, saved searches) to the new data folder once. Electron may already have created
+// the new folder by now, so its contents are moved entry by entry. Runs before app ready.
+const LEGACY_DATA_DIR = path.join(app.getPath('appData'), 'M+ Talent & Gear Inspector');
+const OWN_DATA = ['settings.json', 'data-cache', 'history', 'stats.json'];
+function migrateLegacyData() {
+  const dataDir = app.getPath('userData');
+  if (dataDir === LEGACY_DATA_DIR || !fs.existsSync(LEGACY_DATA_DIR)) return;
+  if (OWN_DATA.some((f) => fs.existsSync(path.join(dataDir, f)))) return; // already in use
+  fs.mkdirSync(dataDir, { recursive: true });
+  for (const entry of fs.readdirSync(LEGACY_DATA_DIR)) {
+    const to = path.join(dataDir, entry);
+    if (fs.existsSync(to)) continue;
+    try {
+      fs.renameSync(path.join(LEGACY_DATA_DIR, entry), to);
+    } catch {
+      // leave it in the old folder
+    }
+  }
+  try {
+    fs.rmdirSync(LEGACY_DATA_DIR); // only succeeds when everything moved
+  } catch {
+    // something stayed behind; harmless
+  }
+}
+try {
+  migrateLegacyData();
+} catch {
+  // the app starts with fresh data; the old folder is left untouched
+}
+
 const cache = require('./cache');
 const stats = require('./stats');
 const settings = require('./settings');
@@ -24,6 +56,7 @@ const EXTERNAL_HOSTS = new Set([
   'wowhead.com',
   'www.warcraftlogs.com',
   'worldofwarcraft.blizzard.com',
+  'github.com',
 ]);
 const LOCALE_IDS = wowhead.LOCALES.map((l) => l.id);
 // Which data source each cache kind holds (for the developer menu).
@@ -75,7 +108,7 @@ function createWindow() {
     minHeight: 720,
     frame: false,
     backgroundColor: '#07070a',
-    title: 'M+ Talent & Gear Inspector',
+    title: 'Keystone Lens',
     icon: fs.existsSync(ICON) ? ICON : undefined,
     show: false,
     webPreferences: {
@@ -304,7 +337,7 @@ ipcMain.handle('export:image', async (_e, { rect, mode, name }) => {
 });
 
 // The Warcraft Logs secret never leaves the main process.
-ipcMain.handle('settings:get', () => ({ settings: settings.getPublic(), locales: wowhead.LOCALES }));
+ipcMain.handle('settings:get', () => ({ settings: settings.getPublic(), locales: wowhead.LOCALES, version: app.getVersion() }));
 
 ipcMain.handle('settings:set', (_e, patch) => {
   const next = settings.set(patch, LOCALE_IDS);
@@ -466,6 +499,15 @@ ipcMain.handle('clipboard:write', async (_e, text) => {
 
 ipcMain.handle('open:external', (_e, url) => openExternal(url));
 
+/** Encrypts the Warcraft Logs secret for the current Windows user (DPAPI via safeStorage). */
+function secretVault() {
+  if (!safeStorage.isEncryptionAvailable()) return null;
+  return {
+    encrypt: (text) => safeStorage.encryptString(text).toString('base64'),
+    decrypt: (b64) => safeStorage.decryptString(Buffer.from(b64, 'base64')),
+  };
+}
+
 ipcMain.handle('window:control', (_e, action) => {
   if (!win) return;
   if (action === 'minimize') win.minimize();
@@ -479,7 +521,7 @@ app.whenReady().then(() => {
   history.init(userData);
   stats.init(userData);
   trackIconDownloads();
-  wowhead.setLocale(settings.init(userData, LOCALE_IDS).tooltipLocale);
+  wowhead.setLocale(settings.init(userData, LOCALE_IDS, { vault: secretVault() }).tooltipLocale);
   createWindow();
 });
 

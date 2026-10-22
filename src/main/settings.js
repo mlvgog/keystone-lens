@@ -9,14 +9,31 @@ const SIZES = [25, 50, 100];
 
 let file = null;
 let data = { ...DEFAULTS };
+let vault = null; // { encrypt(string) -> base64, decrypt(base64) -> string }, e.g. Electron safeStorage
 
-function init(baseDir, validLocales = [0]) {
+/**
+ * Load the settings. With a `vault`, the Warcraft Logs secret is stored encrypted
+ * (`wclClientSecretEnc`); a plain-text secret from an older version is encrypted on load.
+ */
+function init(baseDir, validLocales = [0], { vault: v = null } = {}) {
   file = path.join(baseDir, 'settings.json');
+  vault = v;
+  let raw = {};
   try {
-    data = sanitize({ ...DEFAULTS, ...JSON.parse(fs.readFileSync(file, 'utf8')) }, validLocales);
+    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch {
-    data = { ...DEFAULTS };
+    // first start or unreadable file: defaults
   }
+  let secret = raw.wclClientSecret || '';
+  if (raw.wclClientSecretEnc && vault) {
+    try {
+      secret = vault.decrypt(raw.wclClientSecretEnc);
+    } catch {
+      secret = ''; // encrypted by another Windows user or machine: ask for it again
+    }
+  }
+  data = sanitize({ ...DEFAULTS, ...raw, wclClientSecret: secret }, validLocales);
+  if (vault && raw.wclClientSecret) save();
   return get();
 }
 
@@ -36,6 +53,29 @@ function sanitize(s, validLocales) {
   };
 }
 
+/** What goes into settings.json: the secret only in encrypted form when a vault is available. */
+function serialize() {
+  const { wclClientSecret, ...rest } = data;
+  if (!wclClientSecret) return rest;
+  if (vault) {
+    try {
+      return { ...rest, wclClientSecretEnc: vault.encrypt(wclClientSecret) };
+    } catch {
+      // fall through: keep the secret usable rather than losing it
+    }
+  }
+  return { ...rest, wclClientSecret };
+}
+
+function save() {
+  if (!file) return;
+  try {
+    fs.writeFileSync(file, JSON.stringify(serialize(), null, 2));
+  } catch {
+    // settings still apply for this session
+  }
+}
+
 /** All settings, including secrets (main process only). */
 function get() {
   return { ...data };
@@ -49,13 +89,7 @@ function getPublic() {
 
 function set(patch, validLocales = [0]) {
   data = sanitize({ ...data, ...patch }, validLocales);
-  if (file) {
-    try {
-      fs.writeFileSync(file, JSON.stringify(data, null, 2));
-    } catch {
-      // settings still apply for this session
-    }
-  }
+  save();
   return get();
 }
 

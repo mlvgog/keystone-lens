@@ -116,7 +116,7 @@ export function renderThroughput(container, ctx) {
     seg([['dps', 'Damage (DPS)'], ['hps', 'Healing (HPS)']], metric, (v) => ctx.onLoad({ metric: v })),
     el(
       'div.fb-group',
-      { title: 'Each key level is one lookup per dungeon. Warcraft Logs limits lookups per hour, so wide ranges can hit the limit; loaded levels are cached for a day.' },
+      { title: 'Each key level is one lookup per dungeon. Warcraft Logs limits lookups per hour, so wide ranges can hit the limit; loaded levels are kept for 30 minutes while the app is open.' },
       el('span.fb-label', 'Key levels'),
       levelSelect(from, (v) => ctx.onLoad({ from: v, to: Math.max(v, to) })),
       el('span.faint', 'to'),
@@ -126,7 +126,7 @@ export function renderThroughput(container, ctx) {
       'div.fb-group',
       el('span.fb-label', 'Columns'),
       seg([['level', 'Key level'], ['ilvl', 'Item level']], groupBy, (v) => ctx.onLoad({ groupBy: v }), {
-        ilvl: 'Needs each run’s gear: about 3 MB per key level and dungeon, and a large share of the hourly Warcraft Logs limit for your key. Cached for a day.',
+        ilvl: 'Needs each run’s gear: about 3 MB per key level and dungeon, and a large share of the hourly Warcraft Logs limit for your key. Kept for 30 minutes while the app is open.',
       })
     ),
     el('div.spacer'),

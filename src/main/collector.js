@@ -5,20 +5,20 @@ const raiderio = require('./sources/raiderio');
 const raidbots = require('./sources/raidbots');
 const wowhead = require('./sources/wowhead');
 const { buildCandidates, mostRecentCandidate, findMember, maxVersion, selectRun } = require('./selection');
+const { createDiscovery, poolTarget, rankByScore, specIndexOf } = require('./discovery');
 const { heroSubTrees, variantKeyOf, gearItems } = require('./aggregate');
 const { parseStats, isEmbellished, droppedBy, classifySource } = require('./itemInfo');
 
 const PHASES = [
   { name: 'Loading talent data', weight: 3 },
-  { name: 'Fetching rankings', weight: 3 },
-  { name: 'Scanning players’ keys', weight: 40 },
+  { name: 'Finding players in top keys', weight: 12 },
+  { name: 'Scanning players’ keys', weight: 31 },
   { name: 'Selecting best current-patch keys', weight: 20 },
   { name: 'Loading item data', weight: 30 },
   { name: 'Building report', weight: 4 },
 ];
 
-const SESSION_VERSION = 3;
-const MAX_RANKING_PAGES = 5;
+const SESSION_VERSION = 4;
 const RECENT_PROBES = 10;
 const ARMORY_LOCALE = { us: 'en-us', eu: 'en-gb', kr: 'ko-kr', tw: 'zh-tw' };
 
@@ -49,6 +49,12 @@ class Progress {
 
   setTotal(total) {
     this.total = total;
+    this.emit();
+  }
+
+  set(done, label) {
+    this.done = done;
+    if (label !== undefined) this.label = label;
     this.emit();
   }
 
@@ -233,56 +239,77 @@ async function analyze(opts, { signal, onProgress, force = false, allowStale = f
   const season = await raiderio.getCurrentSeason({ signal });
   progress.step(season.name);
 
-  // 2. Rankings
-  progress.phase(1, 1, `${season.name} · ${region === 'world' ? 'World' : region.toUpperCase()}`);
-  const pool = [];
-  let nextPage = 0;
-  let lastPage = Infinity;
-  async function ensurePool(n) {
-    while (pool.length < n && nextPage <= lastPage && nextPage < MAX_RANKING_PAGES) {
-      const res = await raiderio.getSpecRankings(
-        { season: season.slug, region, classSlug, specSlug, page: nextPage },
-        { signal, force }
-      );
-      nextPage++;
-      lastPage = res.lastPage;
-      if (!res.players.length) break;
-      pool.push(...res.players);
-    }
-  }
-  await ensurePool(sampleSize);
-  if (!pool.length) throw new Error(`raider.io has no ranked ${specName} ${className} players for ${season.name}.`);
-  progress.step(`${pool.length} ranked players loaded`);
+  // 2. Players: everyone who played the spec in the season's top keys (published top-runs lists)
+  const regionName = region === 'world' ? 'World' : region.toUpperCase();
+  const specIndex = specIndexOf(talentData.filter((t) => t.className === className).map((t) => t.specId), specId);
+  const discovery = createDiscovery({
+    dungeons: season.dungeons.map((d) => d.slug).filter(Boolean),
+    specId,
+    // Not forced by Refresh: the pages only find players; scores and keys come fresh from profiles.
+    fetchPage: (dungeon, page) => raiderio.getTopRuns({ season: season.slug, region, dungeon, page }, { signal }),
+  });
+  const target = poolTarget(sampleSize);
+  const maxPages = season.dungeons.length * raiderio.TOP_RUN_PAGES;
+  progress.phase(1, target, `${season.name} · ${regionName}`);
+  // Rare specs can need every page, so the bar follows whichever is further along.
+  await discovery.until(target, () =>
+    progress.set(
+      Math.min(target, Math.max(discovery.players.length, Math.round((discovery.pagesRead / maxPages) * target))),
+      `${discovery.players.length} ${specName} players in ${discovery.pagesRead} of ${maxPages} pages of top keys`
+    )
+  );
+  if (!discovery.players.length) throw new Error(`No ${specName} ${className} players were found in ${season.name} top keys on raider.io (${regionName}).`);
 
   const getRun = runGetter(season.slug, signal);
 
-  // 3. Pass A: candidates + probe the best key of every player. The most recent key of the
-  //    top players is probed too, which is enough to notice that a newer patch is live.
-  async function prepare(player, index = Infinity) {
-    let recent = [];
+  // 3. Pass A: season score + key history of every player found, ranked by score. Then the best
+  //    key of every sampled player is probed, plus the most recent key of the top players, which
+  //    is enough to notice that a newer patch is live.
+  async function load(player) {
+    let profile = { segments: {}, bestRuns: [], recentRuns: [] };
     try {
-      recent = await raiderio.getRecentRuns(player, { signal, force });
+      profile = await raiderio.getMythicPlusProfile(player, { signal, force });
     } catch (err) {
       if (err.name === 'AbortError') throw err;
     }
-    const candidates = buildCandidates(player.runs, recent);
-    const versions = [];
+    const { score, color } = raiderio.specScore(profile.segments, specIndex);
+    return {
+      player: { ...player, score, scoreColor: color },
+      candidates: buildCandidates([...profile.bestRuns, ...player.foundRuns], profile.recentRuns),
+      versions: [],
+    };
+  }
+
+  async function probe(state, index) {
+    const { player, candidates } = state;
     const probes = [candidates[0], index < RECENT_PROBES ? mostRecentCandidate(candidates) : null].filter(Boolean);
     for (const c of new Set(probes)) {
       const member = findMember(await getRun(c.id), player.characterId, specId);
-      if (member?.talents?.version) versions.push(member.talents.version);
+      if (member?.talents?.version) state.versions.push(member.talents.version);
     }
-    return { player, candidates, versions };
+    progress.step(playerLabel(player), `#${player.rank} ${playerLabel(player)} — ${candidates.length} keys found`);
   }
 
-  progress.phase(2, Math.min(sampleSize, pool.length), 'Reading key history');
-  let prepared = await Promise.all(
-    pool.slice(0, sampleSize).map(async (player, index) => {
-      const state = await prepare(player, index);
-      progress.step(playerLabel(player), `#${player.rank} ${playerLabel(player)} — ${state.candidates.length} keys found`);
-      return state;
-    })
-  );
+  let loadedCount = 0;
+  async function loadAll(players, firstRank) {
+    const states = await Promise.all(
+      players.map(async (p) => {
+        const state = await load(p);
+        progress.step(playerLabel(p));
+        return state;
+      })
+    );
+    const ranked = rankByScore(states);
+    ranked.forEach((s, i) => (s.player.rank = firstRank + i));
+    loadedCount += players.length;
+    return ranked;
+  }
+
+  const found = discovery.players.slice();
+  progress.phase(2, found.length + Math.min(sampleSize, found.length), 'Reading key history');
+  let ranked = await loadAll(found, 1);
+  let prepared = ranked.slice(0, sampleSize);
+  await Promise.all(prepared.map((state, index) => probe(state, index)));
   const patch = maxVersion(prepared.flatMap((s) => s.versions));
 
   // 4. Pass B: pick each player's best key on the current patch (or fall back)
@@ -307,17 +334,24 @@ async function analyze(opts, { signal, onProgress, force = false, allowStale = f
   progress.phase(3, prepared.length, 'Matching keys to the current patch');
   await Promise.all(prepared.map(resolve));
 
-  // Backfill from further down the rankings when players had to be skipped.
+  // Backfill with the next players by score (finding more players when needed) when some had to be skipped.
   let cursor = prepared.length;
   while (selected.length < sampleSize) {
-    await ensurePool(cursor + (sampleSize - selected.length));
-    if (cursor >= pool.length) break;
-    const batch = pool.slice(cursor, cursor + (sampleSize - selected.length));
+    const need = sampleSize - selected.length;
+    if (cursor + need > ranked.length && !discovery.exhausted) {
+      await discovery.until(discovery.players.length + need);
+      const fresh = discovery.players.slice(loadedCount);
+      if (fresh.length) {
+        progress.setTotal(progress.total + fresh.length);
+        ranked = ranked.concat(await loadAll(fresh, ranked.length + 1));
+      }
+    }
+    if (cursor >= ranked.length) break;
+    const batch = ranked.slice(cursor, cursor + need);
     cursor += batch.length;
     progress.setTotal(progress.total + batch.length);
-    const extra = await Promise.all(batch.map((player) => prepare(player)));
-    prepared = prepared.concat(extra);
-    await Promise.all(extra.map(resolve));
+    prepared = prepared.concat(batch);
+    await Promise.all(batch.map(resolve));
   }
 
   selected.sort((a, b) => a.player.rank - b.player.rank);

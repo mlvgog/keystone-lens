@@ -143,10 +143,10 @@ export function renderSpecPicker(container, classes, prefs, onStart, { recents =
       ),
       el(
         'div.footnote.faint',
-        'For each of the top-ranked Mythic+ players of the spec (raider.io), the talents and gear saved with their ',
+        'Players of the spec are found in this season’s top keys on raider.io and ranked by their Mythic+ score. For each, the talents and gear saved with their ',
         el('span.dim', 'highest-scoring key on the current patch'),
         ' are used. If a player has no key on the current patch, their best key overall is used instead. ',
-        'Use “Keys since date” to ignore keys played before a tuning hotfix.'
+        'Use “Keys since date” to ignore keys played before a tuning hotfix. Rarely played specs may have fewer players.'
       )
     )
   );

@@ -2,6 +2,8 @@ import { el, toast } from './util.js';
 import { hideTooltip } from './tooltip.js';
 import { attachAutocomplete, matchItems, fold } from './autocomplete.js';
 
+const REPO_URL = 'https://github.com/mlvgog/keystone-lens';
+
 const REGIONS = [
   ['eu', 'Europe (EU)'],
   ['us', 'Americas (US)'],
@@ -195,7 +197,7 @@ function formatBytes(n) {
 
 /** Settings window. `onChanged(settings, { localeChanged })` runs after every change. */
 export async function settingsDialog({ onChanged }) {
-  const { settings, locales } = await window.api.getSettings();
+  const { settings, locales, version } = await window.api.getSettings();
   const lang = el('select.wow-select', {}, locales.map((l) => el('option', { value: String(l.id) }, l.name)));
   lang.value = String(settings.tooltipLocale);
   const region = el(
@@ -312,13 +314,21 @@ export async function settingsDialog({ onChanged }) {
       el('label', 'Client secret', wclSecret),
       wclStatus,
       el('div.dialog-buttons', wclRemove, wclSave),
-      el('p.faint.small', 'Stored only on this PC and only sent to warcraftlogs.com.'),
+      el('p.faint.small', 'Stored only on this PC (the secret encrypted for your Windows account) and only sent to warcraftlogs.com. Warcraft Logs data is never saved to disk.'),
       el('div.dialog-sep'),
       el(
         'div.about',
-        el('div.setting-row', el('div.wow-header', 'About'), dev),
-        el('p.dim.small', 'Rankings, keys and talent/gear snapshots: raider.io · Talent tree layout: raidbots · Item and spell tooltips, item sources: Wowhead.'),
-        el('p.faint.small', 'Not affiliated with Blizzard Entertainment, raider.io, raidbots, Wowhead or Warcraft Logs.')
+        el('div.setting-row', el('div.wow-header', `About · Keystone Lens ${version}`), dev),
+        el('p.dim.small', 'Players, keys and talent/gear snapshots: raider.io · Talent tree layout: raidbots · Item and spell tooltips, item sources: Wowhead · Damage and healing: Warcraft Logs.'),
+        el(
+          'p.dim.small',
+          el('button.link-btn', { onclick: () => window.api.openExternal(REPO_URL) }, 'Source code and releases on GitHub'),
+          ' · free and open source (MIT)'
+        ),
+        el(
+          'p.faint.small',
+          'Not affiliated with or endorsed by Blizzard Entertainment, raider.io, raidbots, Wowhead or Warcraft Logs. World of Warcraft and Warcraft are trademarks or registered trademarks of Blizzard Entertainment, Inc.'
+        )
       )
     ),
     { width: 540 }
@@ -327,8 +337,8 @@ export async function settingsDialog({ onChanged }) {
 
 const KIND_LABELS = {
   run: 'Key snapshots (talents + gear)',
-  rankings: 'Rankings',
-  profile: 'Recent keys',
+  rankings: 'Top keys (players found)',
+  profile: 'Player scores & keys',
   character: 'Compared characters',
   season: 'Season, dungeon & raid lists',
   realms: 'Realm lists',
@@ -338,9 +348,9 @@ const KIND_LABELS = {
   talents: 'Talent trees',
   analysis: 'Finished analyses',
   browserCache: 'Icons & images (browser cache)',
-  wclZone: 'Warcraft Logs season data',
-  wclRankings: 'Warcraft Logs runs (spec)',
-  wclCharacter: 'Warcraft Logs runs (you)',
+  wclZone: 'Warcraft Logs season data (memory only)',
+  wclRankings: 'Warcraft Logs runs, spec (memory only)',
+  wclCharacter: 'Warcraft Logs runs, you (memory only)',
 };
 
 function sum(list, pick) {

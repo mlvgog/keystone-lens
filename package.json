@@ -1,19 +1,44 @@
 {
-  "name": "class-spec-talent-gear",
-  "productName": "M+ Talent & Gear Inspector",
+  "name": "keystone-lens",
+  "productName": "Keystone Lens",
   "version": "1.0.0",
-  "description": "Inspect the talents and gear of the top Mythic+ players for any retail WoW spec (data from raider.io).",
+  "description": "See what the top Mythic+ players run: talent pick rates, popular builds, gear and damage per dungeon for every World of Warcraft spec. Data from raider.io, Wowhead and Warcraft Logs.",
+  "keywords": [
+    "world-of-warcraft",
+    "wow",
+    "mythic-plus",
+    "mplus",
+    "talents",
+    "gear",
+    "bis",
+    "raider-io",
+    "warcraft-logs",
+    "electron"
+  ],
+  "author": "Gog",
+  "license": "MIT",
+  "homepage": "https://github.com/mlvgog/keystone-lens",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mlvgog/keystone-lens.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mlvgog/keystone-lens/issues"
+  },
   "main": "src/main/main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
     "test": "node --test \"test/**/*.test.js\"",
-    "dist": "electron-builder --win portable",
+    "dist": "electron-builder --win nsis portable",
+    "dist:installer": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable",
     "icon": "electron scripts/make-icon.js"
   },
   "build": {
-    "appId": "local.mplus.talentgear",
-    "productName": "M+ Talent & Gear Inspector",
+    "appId": "com.keystonelens.app",
+    "productName": "Keystone Lens",
+    "copyright": "Copyright © 2026 Gog",
     "directories": {
       "output": "dist"
     },
@@ -24,11 +49,25 @@
       "node_modules/@fontsource/marcellus/**/*"
     ],
     "win": {
-      "target": "portable",
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "src/assets/icon.png"
     },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Keystone Lens",
+      "license": "LICENSE.txt",
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "KeystoneLens-Setup-${version}.${ext}"
+    },
     "portable": {
-      "artifactName": "MPlusTalentGearInspector-portable.exe"
+      "artifactName": "KeystoneLens-Portable-${version}.${ext}"
     }
   },
   "dependencies": {

@@ -1,2 +1,25 @@
+# Dependencies and build output
 node_modules/
 dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local environment / secrets (the app stores its own settings in %APPDATA%, never here)
+.env
+.env.*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Local tooling config
+.claude/
+
+# WoW's UI font is Blizzard's; it may be used locally but must not be committed.
+src/renderer/fonts/*.ttf
+src/renderer/fonts/*.TTF

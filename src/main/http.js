@@ -2,7 +2,10 @@
 
 const stats = require('./stats');
 
-const USER_AGENT = 'MPlusTalentGearInspector/1.0 (desktop app)';
+const { version, homepage } = require('../../package.json');
+
+// Identifies the app to the APIs it uses (with a link once the project is public).
+const USER_AGENT = `KeystoneLens/${version} (desktop app${homepage ? `; +${homepage}` : ''})`;
 
 function abortError() {
   const err = new Error('Cancelled');

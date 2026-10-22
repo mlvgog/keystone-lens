@@ -274,14 +274,27 @@ function renderHeader() {
   const current = view.sampleSize - view.fallbackCount;
   const facts = el(
     'div.facts',
-    el('span', 'Top ', el('b', String(meta.requested)), ` · ${regionName}`),
+    el(
+      'span',
+      'Top ',
+      el('b', String(meta.sampleSize)),
+      meta.sampleSize < meta.requested
+        ? el(
+            'span.dim',
+            { title: `Only ${meta.sampleSize} ${meta.specName} players with a usable key were found in this season's top keys on raider.io.` },
+            ` of ${meta.requested}`
+          )
+        : '',
+      ` · ${regionName}`
+    ),
     el('span', el('b', meta.season.name)),
     el('span', 'Patch ', el('b', meta.patch || '?'), meta.since ? ` · keys since ${meta.since}` : ''),
     view.dungeon
       ? el('span', el('b', String(view.baseSize)), ` players with a ${view.dungeon.name} key`)
       : el('span', el('b', String(current)), ' on current patch', view.fallbackCount ? [', ', el('b', String(view.fallbackCount)), ' older'] : ''),
     view.sampleSize !== view.baseSize ? el('span', 'showing ', el('b', String(view.sampleSize))) : null,
-    state.fromCache ? el('span.badge.cached', `cached · ${new Date(meta.generatedAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`) : null
+    state.fromCache ? el('span.badge.cached', `cached · ${new Date(meta.generatedAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`) : null,
+    el('button.link-btn', { onclick: () => window.api.openExternal('https://raider.io'), title: 'Players, keys, talents and gear come from raider.io' }, 'Data: raider.io')
   );
   dom.header.replaceChildren(
     el(
@@ -290,7 +303,7 @@ function renderHeader() {
       el('div.spacer'),
       el(
         'div.actions',
-        el('button.wow-btn.small', { onclick: () => startAnalysis(state.opts, { force: true }), title: 'Fetch fresh rankings and keys', disabled: state.busy }, 'Refresh'),
+        el('button.wow-btn.small', { onclick: () => startAnalysis(state.opts, { force: true }), title: 'Fetch fresh scores and keys', disabled: state.busy }, 'Refresh'),
         el('button.wow-btn.small', { onclick: showPicker, disabled: state.busy }, 'New search')
       )
     ),
