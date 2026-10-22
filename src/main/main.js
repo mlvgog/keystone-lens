@@ -10,9 +10,11 @@ const history = require('./history');
 const raidbots = require('./sources/raidbots');
 const raiderio = require('./sources/raiderio');
 const wowhead = require('./sources/wowhead');
+const wcl = require('./sources/wcl');
 const { buildClassList } = require('./specs');
 const { analyze, loadDungeon } = require('./collector');
 const { buildView, playerDetail } = require('./views');
+const throughput = require('./throughput');
 
 const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
 const EXTERNAL_HOSTS = new Set([
@@ -36,6 +38,9 @@ const KIND_SOURCE = {
   spellTooltip: 'Wowhead',
   itemSource: 'Wowhead',
   talents: 'raidbots',
+  wclZone: 'Warcraft Logs',
+  wclRankings: 'Warcraft Logs',
+  wclCharacter: 'Warcraft Logs',
   analysis: 'Analyses (built locally)',
 };
 const EMPTY_TOTALS = { requests: 0, bytes: 0, errors: 0, retries: 0, ms: 0, avgMs: 0 };
@@ -60,6 +65,7 @@ function trackIconDownloads() {
 let win = null;
 let current = null; // AbortController of the running analysis / dungeon load
 let session = null; // the analysis currently shown
+let throughputTask = null; // AbortController of the running Warcraft Logs load
 
 function createWindow() {
   win = new BrowserWindow({
@@ -297,12 +303,153 @@ ipcMain.handle('export:image', async (_e, { rect, mode, name }) => {
   return { ok: true, filePath };
 });
 
-ipcMain.handle('settings:get', () => ({ settings: settings.get(), locales: wowhead.LOCALES }));
+// The Warcraft Logs secret never leaves the main process.
+ipcMain.handle('settings:get', () => ({ settings: settings.getPublic(), locales: wowhead.LOCALES }));
 
 ipcMain.handle('settings:set', (_e, patch) => {
   const next = settings.set(patch, LOCALE_IDS);
   wowhead.setLocale(next.tooltipLocale);
-  return next;
+  if ('wclClientId' in patch || 'wclClientSecret' in patch) wcl.forgetToken();
+  return settings.getPublic();
+});
+
+const MAX_LEVELS = 15;
+
+/** Damage / healing per dungeon from Warcraft Logs for the current spec (plus your own runs). */
+ipcMain.handle('throughput:get', async (event, params = {}) => {
+  if (!session) return failure(new Error('No analysis loaded'));
+  if (!wcl.hasCredentials()) return { ok: false, code: 'WCL_NO_CREDENTIALS' };
+  throughputTask?.abort();
+  const controller = new AbortController();
+  throughputTask = controller;
+  const { signal } = controller;
+  const emit = (p) => {
+    if (!event.sender.isDestroyed() && throughputTask === controller) event.sender.send('analyze:progress', { kind: 'throughput', ...p });
+  };
+  try {
+    const { meta } = session;
+    const metric = params.metric === 'hps' ? 'hps' : 'dps';
+    const groupBy = params.groupBy === 'ilvl' ? 'ilvl' : 'level';
+    emit({ overall: 0, phase: 'Finding the M+ season on Warcraft Logs', done: 0, total: 0 });
+    const zone = await wcl.getMplusZone({ signal });
+    const dungeons = meta.dungeons
+      .map((d) => {
+        const e = zone.encounters.find((x) => throughput.sameDungeon(x.name, d.name));
+        return e ? { id: e.id, name: d.name } : null;
+      })
+      .filter(Boolean);
+
+    // Your runs first: they can widen the default key-level range.
+    let you = null;
+    if (params.character?.name && params.character?.realm) {
+      const c = params.character;
+      emit({ overall: 0.05, phase: `Loading ${c.name}'s logs`, done: 0, total: 0 });
+      try {
+        const res = await wcl.getCharacterRuns(
+          { name: c.name, realmSlug: raiderio.slugifyRealm(c.realm), region: c.region, encounters: dungeons, specName: meta.specName, metric },
+          { signal, force: params.force }
+        );
+        you = { name: c.name, found: res.found, runs: res.runs };
+      } catch (err) {
+        if (err.name === 'AbortError') throw err;
+        you = { name: c.name, found: false, error: err.message };
+      }
+    }
+
+    let { from, to } =
+      params.from && params.to
+        ? params
+        : throughput.defaultLevels(
+            session.players.map((p) => p.main.run.level),
+            you?.found ? Object.values(you.runs).flat().map((r) => r.level) : []
+          );
+    from = Math.max(2, Math.min(40, Number(from) || 2));
+    to = Math.max(from, Math.min(from + MAX_LEVELS - 1, Number(to) || from));
+    const levels = Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+    const runs = {};
+    const missing = []; // dungeons that could not be loaded (Warcraft Logs limit reached)
+    let limitError = null;
+    let done = 0;
+    const phase = groupBy === 'ilvl' ? 'Loading logged runs with gear' : 'Loading logged runs';
+    emit({ overall: 0.1, phase, done, total: dungeons.length });
+    await Promise.all(
+      dungeons.map(async (d) => {
+        try {
+          runs[d.id] = await wcl.getSpecRuns(
+            {
+              encounterId: d.id,
+              className: meta.className,
+              specName: meta.specName,
+              metric,
+              levels,
+              withGear: groupBy === 'ilvl',
+              averageItemLevel: throughput.averageItemLevel,
+            },
+            { signal, force: params.force }
+          );
+        } catch (err) {
+          if (err.code !== 'WCL_LIMIT') throw err;
+          limitError = err;
+          missing.push(d.name);
+          runs[d.id] = {};
+        }
+        done++;
+        emit({ overall: 0.1 + 0.9 * (done / dungeons.length), phase, done, total: dungeons.length, label: d.name });
+      })
+    );
+
+    let rate = null;
+    try {
+      rate = await wcl.rateLimit({ signal });
+    } catch (err) {
+      if (err.name === 'AbortError') throw err;
+    }
+    if (missing.length === dungeons.length) {
+      return { ok: false, code: 'WCL_LIMIT', error: limitError.message, resetIn: rate?.pointsResetIn ?? null };
+    }
+    return {
+      ok: true,
+      data: {
+        missing,
+        resetIn: missing.length ? rate?.pointsResetIn ?? null : null,
+        metric,
+        groupBy,
+        from,
+        to,
+        levels,
+        zone: { id: zone.id, name: zone.name },
+        table: throughput.buildTable({ dungeons, runs, levels, groupBy }),
+        you: you && {
+          name: you.name,
+          found: you.found,
+          error: you.error || null,
+          dungeons: you.found
+            ? throughput.compareYou({ dungeons, runs, yourRuns: you.runs, levels, self: { name: params.character.name, realm: params.character.realm } })
+            : null,
+        },
+        rate,
+      },
+    };
+  } catch (err) {
+    if (['WCL_NO_CREDENTIALS', 'WCL_BAD_CREDENTIALS', 'WCL_LIMIT'].includes(err.code)) return { ok: false, code: err.code, error: err.message };
+    return failure(err);
+  } finally {
+    if (throughputTask === controller) throughputTask = null;
+  }
+});
+
+ipcMain.handle('throughput:cancel', () => {
+  throughputTask?.abort();
+  throughputTask = null;
+});
+
+ipcMain.handle('wcl:test', async () => {
+  try {
+    return { ok: true, limits: await wcl.testConnection() };
+  } catch (err) {
+    return failure(err);
+  }
 });
 
 ipcMain.handle('cache:info', () => cache.info());

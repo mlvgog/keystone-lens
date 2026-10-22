@@ -70,10 +70,11 @@ function backoffMs(attempt) {
 }
 
 /**
- * GET a URL and parse the body (JSON by default). Retries on network errors, HTTP 429
- * and 5xx with exponential backoff (honouring Retry-After). Throws on other HTTP errors.
+ * Request a URL (GET unless `method` is given) and parse the body (JSON by default).
+ * Retries on network errors, HTTP 429 and 5xx with exponential backoff (honouring
+ * Retry-After). Throws on other HTTP errors (`err.status` is set).
  */
-async function request(url, { signal, retries = 5, as = 'json' } = {}) {
+async function request(url, { signal, retries = 5, as = 'json', method = 'GET', headers = {}, body: payload } = {}) {
   return limiterFor(url).run(async () => {
     for (let attempt = 0; ; attempt++) {
       if (signal?.aborted) throw abortError();
@@ -84,7 +85,9 @@ async function request(url, { signal, retries = 5, as = 'json' } = {}) {
       let body;
       try {
         res = await fetch(url, {
-          headers: { 'User-Agent': USER_AGENT, Accept: as === 'json' ? 'application/json' : '*/*' },
+          method,
+          headers: { 'User-Agent': USER_AGENT, Accept: as === 'json' ? 'application/json' : '*/*', ...headers },
+          body: payload,
           signal: combined,
         });
         if (res.ok) {
@@ -117,4 +120,4 @@ async function request(url, { signal, retries = 5, as = 'json' } = {}) {
 const fetchJson = (url, opts = {}) => request(url, { ...opts, as: 'json' });
 const fetchText = (url, opts = {}) => request(url, { ...opts, as: 'text' });
 
-module.exports = { fetchJson, fetchText, sleep, abortError, Limiter };
+module.exports = { request, fetchJson, fetchText, sleep, abortError, Limiter };

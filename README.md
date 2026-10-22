@@ -49,6 +49,19 @@ These sit under the title and apply to every tab.
   - An orange ring marks an unusual pick.
 - Each gear slot shows your item and how popular it is.
 
+### Damage (Warcraft Logs)
+- Median **DPS** (or **HPS** for healing) of the spec in each dungeon, per key level, from logged keys on Warcraft Logs. Hover a cell for the average, the middle half of runs, the range, run time and how many runs it is based on. Cells with fewer than 5 runs are greyed out.
+- **Columns by item level** instead of key level: the same numbers grouped by the players' equipped item level (needs each run's gear, so it downloads much more).
+- **Your own runs** (when "Compare with my character" is on): every logged key of yours in the selected range, with the spec median at the same key level, the difference in %, and the share of other logged runs you beat. Your best run per key level also shows inside the table. Links open the log on Warcraft Logs.
+- Numbers are per second over the whole key, like Details' "overall" segment. Per dungeon and key level, Warcraft Logs ranks up to 100 of the best-timed logged runs; players who log tend to be above average.
+
+**Setup:** this needs your own free Warcraft Logs API client.
+1. Sign in at warcraftlogs.com and open https://www.warcraftlogs.com/api/clients/.
+2. Create a client (any name, redirect URL `http://localhost`, *not* a public client).
+3. Paste the client ID and secret into ⚙ Settings → Warcraft Logs and press **Save & test**. They are stored only on your PC.
+
+Warcraft Logs limits lookups per hour for each API key. Each key level in the range costs one lookup per dungeon, the item-level view costs a lot more, and everything loaded is cached for a day. If the limit is reached, the tab tells you when it resets.
+
 ### Other
 - **Export:** save or copy the talent tree as an image, for example for Discord.
 - **Settings (⚙):** tooltip language (9 languages), default region and player count, cache size and clear cache.
@@ -101,6 +114,7 @@ All public, no API key needed:
 - [raider.io](https://raider.io): rankings, key history, talent and gear snapshots per key, your character, dungeon and raid lists.
 - [raidbots](https://www.raidbots.com/static/data/live/talents.json): talent tree layout (positions, connections, icons).
 - [Wowhead](https://www.wowhead.com): item stats for the exact item variant (bonus IDs and item level), talent descriptions, and item sources.
+- [Warcraft Logs](https://www.warcraftlogs.com) (optional, with your own API client): damage and healing per dungeon and key level, and your own logged runs.
 
 ## Optional: the in-game font
 
@@ -132,5 +146,7 @@ npm run icon
 | `src/main/history.js` | Trend snapshots |
 | `src/main/settings.js` | Settings |
 | `src/main/stats.js` | Download and cache statistics for the developer menu |
+| `src/main/throughput.js` | Damage / healing statistics (medians per dungeon and key or item level, your runs vs the spec) |
+| `src/main/sources/wcl.js` | Warcraft Logs client (OAuth client credentials, GraphQL, rankings) |
 | `src/main/sources/` | raider.io / raidbots / Wowhead clients (rate limited, retried, cached) |
 | `src/renderer/` | UI (plain HTML/CSS/ES modules) |

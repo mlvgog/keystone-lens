@@ -238,6 +238,51 @@ export async function settingsDialog({ onChanged }) {
   region.addEventListener('change', () => save({ defaultRegion: region.value }));
   size.addEventListener('change', () => save({ defaultSize: Number(size.value) }));
 
+  // Warcraft Logs API client (for damage / healing numbers). The secret is never sent back here.
+  const wclId = el('input.wow-input', { placeholder: 'Client ID', value: settings.wclClientId || '' });
+  const wclSecret = el('input.wow-input', { type: 'password', placeholder: settings.wclHasSecret ? '•••••••• (saved)' : 'Client secret' });
+  const wclStatus = el('div.dialog-status');
+  const setWclStatus = (text, cls = '') => {
+    wclStatus.className = `dialog-status ${cls}`;
+    wclStatus.textContent = text;
+  };
+  setWclStatus(
+    settings.wclClientId && settings.wclHasSecret ? 'Saved. Use “Save & test” to check the connection.' : 'Needed for damage and healing numbers.'
+  );
+  const testWcl = async () => {
+    setWclStatus('Connecting to Warcraft Logs…');
+    const res = await window.api.wclTest();
+    if (res.ok) {
+      const l = res.limits || {};
+      setWclStatus(`✔ Connected — ${Math.round(l.pointsSpentThisHour || 0)} of ${l.limitPerHour ?? '?'} API points used this hour.`, 'good');
+    } else {
+      setWclStatus(res.error || 'Could not connect.', 'bad');
+    }
+  };
+  const wclSave = el('button.wow-btn.small', 'Save & test');
+  wclSave.addEventListener('click', async () => {
+    const patch = { wclClientId: wclId.value.trim() };
+    if (wclSecret.value.trim()) patch.wclClientSecret = wclSecret.value.trim();
+    await save(patch);
+    wclSecret.value = '';
+    wclSecret.placeholder = settings.wclHasSecret ? '•••••••• (saved)' : 'Client secret';
+    if (!settings.wclClientId || !settings.wclHasSecret) return setWclStatus('Enter both the client ID and the client secret.', 'bad');
+    testWcl();
+  });
+  const wclRemove = el('button.wow-btn.small', 'Remove');
+  wclRemove.addEventListener('click', async () => {
+    await save({ wclClientId: '', wclClientSecret: '' });
+    wclId.value = '';
+    wclSecret.placeholder = 'Client secret';
+    setWclStatus('Removed.');
+  });
+  wclSecret.addEventListener('keydown', (e) => e.key === 'Enter' && wclSave.click());
+  const wclLink = el(
+    'button.link-btn',
+    { onclick: () => window.api.openExternal('https://www.warcraftlogs.com/api/clients/') },
+    'Get a free API client'
+  );
+
   const dev = el(
     'button.wow-btn.small',
     {
@@ -262,14 +307,21 @@ export async function settingsDialog({ onChanged }) {
       el('div.setting-row', el('span', 'Cache: ', cacheLine), clearBtn),
       el('p.faint.small', 'Key snapshots are kept forever because they never change; everything else refreshes automatically. Your trend history and settings are not affected.'),
       el('div.dialog-sep'),
+      el('div.setting-row', el('div.wow-header', 'Warcraft Logs'), wclLink),
+      el('label', 'Client ID', wclId),
+      el('label', 'Client secret', wclSecret),
+      wclStatus,
+      el('div.dialog-buttons', wclRemove, wclSave),
+      el('p.faint.small', 'Stored only on this PC and only sent to warcraftlogs.com.'),
+      el('div.dialog-sep'),
       el(
         'div.about',
         el('div.setting-row', el('div.wow-header', 'About'), dev),
         el('p.dim.small', 'Rankings, keys and talent/gear snapshots: raider.io · Talent tree layout: raidbots · Item and spell tooltips, item sources: Wowhead.'),
-        el('p.faint.small', 'Not affiliated with Blizzard Entertainment, raider.io, raidbots or Wowhead.')
+        el('p.faint.small', 'Not affiliated with Blizzard Entertainment, raider.io, raidbots, Wowhead or Warcraft Logs.')
       )
     ),
-    { width: 500 }
+    { width: 540 }
   );
 }
 
@@ -286,6 +338,9 @@ const KIND_LABELS = {
   talents: 'Talent trees',
   analysis: 'Finished analyses',
   browserCache: 'Icons & images (browser cache)',
+  wclZone: 'Warcraft Logs season data',
+  wclRankings: 'Warcraft Logs runs (spec)',
+  wclCharacter: 'Warcraft Logs runs (you)',
 };
 
 function sum(list, pick) {

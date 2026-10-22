@@ -1945,6 +1945,9 @@ table.ov-table {
 .dialog-status.bad {
   color: #ff8a7a;
 }
+.dialog-status.good {
+  color: #7dff7d;
+}
 .dialog-buttons {
   display: flex;
   justify-content: flex-end;
@@ -2136,4 +2139,134 @@ table.dev-table {
 .dev .dialog-buttons {
   flex-wrap: wrap;
   margin-top: 4px;
+}
+
+/* ==================================================================== v4: Damage tab (Warcraft Logs) */
+.tp-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 10px 16px 0;
+}
+.tp-wrap {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 0 16px 20px;
+}
+.tp-wrap > :first-child {
+  margin-top: 12px;
+}
+.tp-setup,
+.tp-loading {
+  max-width: 640px;
+  margin: 40px auto 0;
+  padding: 22px 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.tp-setup .wow-header,
+.tp-loading .wow-header {
+  font-size: 17px;
+}
+.tp-loading .castbar {
+  width: 100%;
+}
+.tp-summary {
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.tp-table-wrap {
+  overflow-x: auto;
+}
+.tp-table th.num {
+  text-align: center;
+}
+.tp-table td {
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+.tp-table tbody tr:hover td {
+  cursor: default;
+}
+.tp-name {
+  min-width: 170px;
+  color: #fff;
+}
+.tp-you-line {
+  font-size: 11px;
+  margin-top: 1px;
+}
+.tp-cell {
+  min-width: 74px;
+  text-align: center;
+  border-left: 1px solid rgba(0, 0, 0, 0.5);
+}
+.tp-cell.empty {
+  color: var(--text-faint);
+  background: rgba(0, 0, 0, 0.25);
+}
+.tp-median {
+  font-size: 15px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 1px #000;
+  font-variant-numeric: tabular-nums;
+}
+.tp-n {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.tp-cell.few .tp-median {
+  color: var(--text-faint);
+  font-weight: normal;
+}
+.tp-you {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: bold;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(95, 224, 255, 0.4);
+}
+.tp-total td {
+  border-top: 1px solid #6f5726;
+}
+.tp-total .tp-name {
+  font-family: var(--font-head);
+  color: var(--gold);
+}
+.up { color: #7dff7d; }
+.down { color: #ff8a7a; }
+.even { color: #ffe680; }
+.na { color: var(--text-faint); }
+.tp-yours {
+  margin-top: 14px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tp-runs td,
+.tp-runs th {
+  font-size: 12px;
+}
+.tp-runs tbody tr:hover td {
+  cursor: default;
+}
+.tp-amount {
+  color: #5fe0ff;
+  font-weight: bold;
+}
+.tp-foot {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.tp-warn {
+  margin: 12px 0 0;
 }

@@ -19,6 +19,7 @@ const HOST_SOURCES = {
   'www.wowhead.com': 'Wowhead',
   'wowhead.com': 'Wowhead',
   'www.raidbots.com': 'raidbots',
+  'www.warcraftlogs.com': 'Warcraft Logs',
   // Icons are loaded by the page itself from these CDNs.
   'wow.zamimg.com': 'Icons (CDN)',
   'cdn.raiderio.net': 'Icons (CDN)',

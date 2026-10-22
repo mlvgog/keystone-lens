@@ -5,6 +5,7 @@ import { renderProgress, castbar } from './progress.js';
 import { renderTalents, pickMap, clearSpellCache } from './talentTree.js';
 import { renderGear } from './gearView.js';
 import { renderPlayers } from './playersView.js';
+import { renderThroughput } from './throughputView.js';
 import { renderFilterBar } from './filterBar.js';
 import { compareDialog, settingsDialog, devDialog } from './dialogs.js';
 
@@ -30,6 +31,7 @@ const state = {
   inspect: null, // player detail while inspecting one player
   character: null, // your character while comparing
   busy: false, // a dungeon is loading
+  tp: null, // Damage tab: { params, data, loading, error }
 };
 
 let teardown = null;
@@ -64,17 +66,23 @@ document.querySelectorAll('[data-win]').forEach((b) => b.addEventListener('click
 document.querySelector('.titlebar').addEventListener('dblclick', (e) => {
   if (!e.target.closest('.win-buttons')) window.api.windowControl('maximize');
 });
-document.querySelector('[data-action=settings]').addEventListener('click', () =>
+function openSettings() {
   settingsDialog({
     onChanged: (settings, { localeChanged }) => {
+      const wclChanged = settings.wclClientId !== state.settings?.wclClientId || settings.wclHasSecret !== state.settings?.wclHasSecret;
       state.settings = settings;
       if (localeChanged) {
         clearSpellCache();
         if (state.view) refreshView();
       }
+      if (wclChanged) {
+        state.tp = null;
+        if (state.tab === 'damage') renderTab();
+      }
     },
-  })
-);
+  });
+}
+document.querySelector('[data-action=settings]').addEventListener('click', openSettings);
 
 // Developer menu: Ctrl+Shift+D (also reachable from Settings).
 document.addEventListener('keydown', (e) => {
@@ -180,6 +188,7 @@ function applyResult(opts, result) {
   state.filters = { ...NO_FILTERS };
   state.inspect = null;
   state.history = [];
+  state.tp = null;
   window.api.historyList().then((list) => {
     state.history = list;
     if (dom) renderHeader();
@@ -234,6 +243,7 @@ async function restoreCharacter() {
   if (res.ok && res.character.className === state.meta.className) {
     state.character = res.character;
     rememberCharacter(mine, res.character);
+    invalidateThroughput();
     if (dom) renderAll();
   }
 }
@@ -394,9 +404,70 @@ function renderTab() {
     onFilter: setFilters,
     onInspect: inspectPlayer,
   };
+  tpView = null;
   if (state.tab === 'talents') teardown = renderTalents(dom.body, ctx);
   else if (state.tab === 'gear') renderGear(dom.body, ctx);
-  else renderPlayers(dom.body, ctx);
+  else if (state.tab === 'damage') {
+    if (hasWcl() && !state.tp?.data && !state.tp?.loading && !state.tp?.error) {
+      loadThroughput();
+      return;
+    }
+    tpView = renderThroughput(dom.body, {
+      ...ctx,
+      tp: state.tp,
+      hasWcl: hasWcl(),
+      onLoad: loadThroughput,
+      onCancel: cancelThroughput,
+      openSettings,
+    });
+  } else renderPlayers(dom.body, ctx);
+}
+
+// ---------------------------------------------------------------- Damage tab (Warcraft Logs)
+const HEALER_SPECS = new Set([65, 105, 256, 257, 264, 270, 1468]);
+let tpView = null; // { setProgress } while the Damage tab shows a loading bar
+let tpToken = null;
+const hasWcl = () => !!(state.settings?.wclClientId && state.settings?.wclHasSecret);
+
+window.api.onProgress((p) => {
+  if (p.kind === 'throughput') tpView?.setProgress?.(p);
+});
+
+/** Load (or reload with changed options) the damage numbers for the current spec. */
+async function loadThroughput(patch = {}, { force = false } = {}) {
+  const params = {
+    metric: HEALER_SPECS.has(state.meta.specId) ? 'hps' : 'dps',
+    groupBy: 'level',
+    ...(state.tp?.params || {}),
+    ...patch,
+  };
+  const previous = state.tp?.data || null;
+  state.tp = { params, data: previous, loading: true, error: null };
+  const token = (tpToken = {});
+  if (state.tab === 'damage') renderTab();
+  const c = state.character;
+  const res = await window.api.throughput({ ...params, force, character: c ? { name: c.name, realm: c.realm, region: c.region } : null });
+  if (token !== tpToken) return; // a newer request replaced this one
+  if (res.ok) state.tp = { params: { ...params, from: res.data.from, to: res.data.to }, data: res.data, loading: false, error: null };
+  else if (res.cancelled) state.tp = { params, data: previous, loading: false, error: previous ? null : 'Cancelled.' };
+  else if (res.code === 'WCL_NO_CREDENTIALS') state.tp = { params, data: null, loading: false, error: null };
+  else if (res.code === 'WCL_LIMIT') state.tp = { params, data: previous, loading: false, error: limitMessage(res.resetIn) };
+  else state.tp = { params, data: null, loading: false, error: res.error || 'Could not load Warcraft Logs data.' };
+  if (state.tab === 'damage') renderTab();
+}
+
+function limitMessage(resetIn) {
+  const minutes = resetIn ? Math.max(1, Math.ceil(resetIn / 60)) : null;
+  return `Warcraft Logs' hourly limit for your API key is used up${minutes ? ` — it resets in about ${minutes} minute${minutes === 1 ? '' : 's'}` : ''}. Everything already loaded stays cached for a day, so switching back costs nothing.`;
+}
+
+function cancelThroughput() {
+  window.api.cancelThroughput();
+}
+
+/** Your character changed: the Damage tab reloads (with your runs) the next time it renders. */
+function invalidateThroughput() {
+  if (state.tp) state.tp = { params: state.tp.params, data: null, loading: false, error: null };
 }
 
 tabs.querySelectorAll('.tab').forEach((t) =>
@@ -496,6 +567,7 @@ async function openCompare() {
       if (!apply) return;
       state.character = character;
       savePrefs({ compareActive: true });
+      invalidateThroughput();
       renderAll();
     },
     onForget: forgetCharacter,
@@ -506,6 +578,7 @@ async function openCompare() {
 function stopCompare() {
   state.character = null;
   savePrefs({ compareActive: false });
+  invalidateThroughput();
   renderAll();
 }
 
