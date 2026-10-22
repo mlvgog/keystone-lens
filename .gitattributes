@@ -5,3 +5,6 @@
 *.png binary
 *.jpg binary
 *.ico binary
+
+# The inline script's CSP hash is computed over LF line endings.
+src/renderer/wowhead-frame.html text eol=lf

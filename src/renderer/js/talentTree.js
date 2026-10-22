@@ -1,24 +1,13 @@
-import { el, iconImg, clear, pct, safeFragment, toast, fmtDelta } from './util.js';
+import { el, iconImg, clear, pct, toast, fmtDelta } from './util.js';
 import { attachTooltip, hideTooltip } from './tooltip.js';
+import { spellRef } from './wowheadTooltip.js';
 
-const UNIT = 600; // raidbots position units per grid cell
+const UNIT = 600; // game position units per grid cell
 const CELL = 60; // px per grid cell
 const PAD_X = 52;
 const PAD_TOP = 34;
 const PAD_BOTTOM = 42;
 const SVG_NS = 'http://www.w3.org/2000/svg';
-
-const spellCache = new Map();
-function loadSpell(spellId) {
-  if (!spellId) return Promise.resolve(null);
-  if (!spellCache.has(spellId)) spellCache.set(spellId, window.api.spellTooltip(spellId));
-  return spellCache.get(spellId);
-}
-
-/** Talent descriptions are cached per language; call after the tooltip language changes. */
-export function clearSpellCache() {
-  spellCache.clear();
-}
 
 function pickClass(p, picked) {
   if (!picked) return 'p-zero';
@@ -73,19 +62,11 @@ export function pickMap(talents) {
 
 const EMPTY_STATS = { picked: 0, total: 0, pct: 0, ranks: {}, entries: {}, avgRank: 0 };
 
-/** Description block for one entry, filled in when wowhead answers. */
-function descriptionBlock(entry) {
-  const box = el('div.wh.tt-desc', el('span.tt-grey', 'Loading description…'));
-  loadSpell(entry.spellId).then((sp) => {
-    if (!sp?.tooltip) {
-      box.replaceChildren(el('span.tt-grey', 'No description available.'));
-      return;
-    }
-    const frag = safeFragment(sp.tooltip);
-    frag.querySelectorAll('.whtt-name, .wowhead-tooltip-requirements').forEach((n) => n.remove());
-    box.replaceChildren(frag);
-  });
-  return box;
+/** The entry whose description Wowhead's tooltip shows: the pick (player's, then yours), else the most popular. */
+function describedEntry(node, stats, d) {
+  if (node.type !== 'choice') return node.entries[0];
+  const id = d.pick?.entryId ?? d.you?.entryId ?? majorityEntry(stats);
+  return node.entries.find((e) => String(e.id) === String(id)) || node.entries[0];
 }
 
 function entryName(node, entryId) {
@@ -131,7 +112,7 @@ function nodeTooltip(node, stats, d) {
       box.append(
         el(
           'div.tt-choice',
-          iconImg(e.icon, { cls: 'icon', spellId: e.spellId }),
+          iconImg(e.icon, { cls: 'icon' }),
           el(
             'div',
             el(
@@ -139,7 +120,6 @@ function nodeTooltip(node, stats, d) {
               el('span', e.name, chosen ? el('span.tt-gold', ' ✔') : null),
               stats.total ? el('span.tt-gold', `${n} (${pct(n / stats.total)})`) : null
             ),
-            descriptionBlock(e)
           )
         )
       );
@@ -153,13 +133,11 @@ function nodeTooltip(node, stats, d) {
       box.append(
         el(
           'div.tt-choice',
-          iconImg(e.icon, { cls: 'icon', spellId: e.spellId }),
-          el('div', el('div', `Tier ${i + 1} · rank ${from === rank ? from : `${from}–${rank}`}`), descriptionBlock(e))
+          iconImg(e.icon, { cls: 'icon' }),
+          el('div', `Tier ${i + 1} · rank ${from === rank ? from : `${from}–${rank}`}`)
         )
       );
     });
-  } else {
-    box.append(el('div.tt-sep'), descriptionBlock(node.entries[0] || {}));
   }
   return box;
 }
@@ -175,10 +153,10 @@ function nodeElement(node, stats, d) {
   const level = player ? (d.pick ? 'p-gold' : 'p-zero') : pickClass(stats.pct, stats.picked);
   const inner = el('div.inner');
   if (node.type === 'choice' && node.entries.length >= 2 && !(player && d.pick)) {
-    for (const e of node.entries.slice(0, 2)) inner.append(el('div.half', iconImg(e.icon, { spellId: e.spellId })));
+    for (const e of node.entries.slice(0, 2)) inner.append(el('div.half', iconImg(e.icon)));
   } else {
     const entry = (player && d.pick && node.entries.find((e) => e.id === d.pick.entryId)) || node.entries[0];
-    inner.append(iconImg(entry?.icon, { spellId: entry?.spellId }));
+    inner.append(iconImg(entry?.icon));
   }
 
   const nodeEl = el(`div.tnode.${shape}.${level}`, el('div.shape', inner));
@@ -206,7 +184,7 @@ function nodeElement(node, stats, d) {
       nodeEl.classList.add('you-missing');
     }
   }
-  attachTooltip(nodeEl, () => nodeTooltip(node, stats, d));
+  attachTooltip(nodeEl, () => nodeTooltip(node, stats, d), { wowhead: () => spellRef(describedEntry(node, stats, d)?.spellId) });
   return nodeEl;
 }
 

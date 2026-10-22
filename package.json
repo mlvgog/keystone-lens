@@ -45,7 +45,6 @@
     "files": [
       "src/**/*",
       "package.json",
-      "node_modules/dompurify/dist/purify.min.js",
       "node_modules/@fontsource/marcellus/**/*"
     ],
     "win": {
@@ -71,8 +70,7 @@
     }
   },
   "dependencies": {
-    "@fontsource/marcellus": "^5.3.0",
-    "dompurify": "^3.4.17"
+    "@fontsource/marcellus": "^5.3.0"
   },
   "devDependencies": {
     "electron": "^44.9.1",

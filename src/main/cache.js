@@ -15,6 +15,9 @@ const DAY = 24 * HOUR;
  */
 const MEMORY_ONLY = new Set(['wclZone', 'wclRankings', 'wclCharacter']);
 
+/** Kinds older versions stored that are no longer used (Wowhead tooltip data); deleted on start. */
+const RETIRED = ['itemTooltip', 'spellTooltip'];
+
 /**
  * Time-to-live per cache kind. Run snapshots never change, so they never expire. Top-runs
  * pages ("rankings") are the same for every spec, so later searches of any spec reuse them.
@@ -30,9 +33,10 @@ const TTL = {
   wclRankings: 30 * MINUTE,
   wclCharacter: 30 * MINUTE,
   run: Infinity,
-  itemTooltip: 7 * DAY,
   itemSource: 7 * DAY,
-  spellTooltip: 7 * DAY,
+  itemData: 7 * DAY,
+  itemBonus: 7 * DAY,
+  gameTables: DAY,
   analysis: HOUR,
 };
 
@@ -47,8 +51,8 @@ function init(baseDir) {
   cacheDir = path.join(baseDir, DIR_NAME);
   fs.mkdirSync(cacheDir, { recursive: true });
   migrateLegacy(path.join(baseDir, LEGACY_DIR_NAME));
-  // Earlier versions stored Warcraft Logs data on disk.
-  for (const kind of MEMORY_ONLY) {
+  // Earlier versions stored Warcraft Logs data and Wowhead tooltips on disk.
+  for (const kind of [...MEMORY_ONLY, ...RETIRED]) {
     try {
       fs.rmSync(path.join(cacheDir, kind), { recursive: true, force: true });
     } catch {

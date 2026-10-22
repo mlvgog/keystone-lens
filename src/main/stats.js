@@ -15,14 +15,17 @@ const SAVE_DELAY_MS = 5000;
 const HOST_SOURCES = {
   'raider.io': 'raider.io',
   'www.raider.io': 'raider.io',
-  'nether.wowhead.com': 'Wowhead',
   'www.wowhead.com': 'Wowhead',
   'wowhead.com': 'Wowhead',
-  'www.raidbots.com': 'raidbots',
+  // Wowhead's tooltips script and its data, loaded by the page.
+  'nether.wowhead.com': 'Wowhead',
+  'wow.zamimg.com': 'Wowhead',
+  'wago.tools': 'wago.tools',
+  'raw.githubusercontent.com': 'SimulationCraft',
   'www.warcraftlogs.com': 'Warcraft Logs',
   // Icons are loaded by the page itself from these CDNs.
-  'wow.zamimg.com': 'Icons (CDN)',
   'cdn.raiderio.net': 'Icons (CDN)',
+  'render.worldofwarcraft.com': 'Icons (CDN)',
 };
 
 let file = null;

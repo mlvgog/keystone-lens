@@ -54,16 +54,19 @@ function session() {
   };
 }
 
-test('unfiltered view: everyone, hero shares, tooltips and sources attached', async () => {
+test('unfiltered view: everyone, hero shares, item details and sources attached', async () => {
   const s = session();
-  const v = await buildView(s, {}, { getTooltip: async (x) => ({ tooltip: `<b>${x.id}</b>` }) });
+  s.itemSources[100].slotType = 'Head Plate';
+  s.itemInfo[variantKeyOf(item(100, 334))] = { stats: { crit: 146, haste: 63, mastery: 0, vers: 0 }, primary: { name: 'Strength/Intellect', value: 207 }, sockets: 0, embellished: false };
+  const v = await buildView(s, {});
   assert.equal(v.sampleSize, 4);
   assert.equal(v.baseSize, 4);
   assert.deepEqual(v.hero.map((h) => [h.name, h.count]), [['Alpha', 2], ['Beta', 2]]);
   assert.equal(v.talents.nodes[2].pct, 0.5);
   const head = v.gear.find((g) => g.key === 'head');
   assert.equal(head.items[0].id, 100);
-  assert.equal(head.items[0].tooltip, '<b>100</b>');
+  assert.deepEqual(head.items[0].details.stats, { crit: 146, haste: 63, mastery: 0, vers: 0 });
+  assert.equal(head.items[0].details.slotType, 'Head Plate');
   assert.equal(head.items[0].source.detail, 'Big Raid');
   assert.deepEqual(v.players.map((p) => p.name), ['P1', 'P2', 'P3', 'P4']);
   assert.deepEqual(v.gearSummary.weapons, [{ label: 'One-hander + off-hand', count: 2 }, { label: 'Two-hander', count: 2 }]);

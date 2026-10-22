@@ -13,7 +13,9 @@ test('hosts map to data sources', () => {
   assert.equal(stats.sourceOf('https://raider.io/api/v1/mythic-plus/run-details?id=1'), 'raider.io');
   assert.equal(stats.sourceOf('https://nether.wowhead.com/tooltip/item/1'), 'Wowhead');
   assert.equal(stats.sourceOf('https://www.wowhead.com/item=1&xml'), 'Wowhead');
-  assert.equal(stats.sourceOf('https://www.raidbots.com/static/data/live/talents.json'), 'raidbots');
+  assert.equal(stats.sourceOf('https://wago.tools/db2/TraitNode/csv'), 'wago.tools');
+  assert.equal(stats.sourceOf('https://raw.githubusercontent.com/simulationcraft/simc/HEAD/engine/dbc/generated/trait_data.inc'), 'SimulationCraft');
+  assert.equal(stats.sourceOf('https://nether.wowhead.com/tooltip/item/1'), 'Wowhead');
   assert.equal(stats.sourceOf('https://example.org/x'), 'example.org');
   assert.equal(stats.sourceOf('not a url'), 'unknown');
 });
@@ -33,9 +35,9 @@ test('requests are totalled per source for the session and all time', () => {
 });
 
 test('icon downloads count towards their own source but stay out of the request log', () => {
-  assert.equal(stats.sourceOf('https://wow.zamimg.com/images/wow/icons/large/x.jpg'), 'Icons (CDN)');
+  assert.equal(stats.sourceOf('https://render.worldofwarcraft.com/us/icons/56/x.jpg'), 'Icons (CDN)');
   assert.equal(stats.sourceOf('https://cdn.raiderio.net/images/wow/icons/large/x.jpg'), 'Icons (CDN)');
-  stats.recordRequest({ url: 'https://wow.zamimg.com/images/wow/icons/large/x.jpg', status: 200, bytes: 4000, ms: 30, log: false });
+  stats.recordRequest({ url: 'https://cdn.raiderio.net/images/wow/icons/large/x.jpg', status: 200, bytes: 4000, ms: 30, log: false });
   const s = stats.snapshot();
   assert.equal(s.session['Icons (CDN)'].bytes, 4000);
   assert.equal(s.recent.length, 0);
@@ -58,16 +60,16 @@ test('cache hits and misses per kind', () => {
 test('all-time totals survive a restart and can be reset', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mplus-stats-'));
   stats.init(dir);
-  stats.recordRequest({ url: 'https://www.raidbots.com/t.json', status: 200, bytes: 2048, ms: 10 });
+  stats.recordRequest({ url: 'https://wago.tools/db2/t/csv', status: 200, bytes: 2048, ms: 10 });
   stats.flush();
   stats._reset();
   stats.init(dir);
   const s = stats.snapshot();
-  assert.equal(s.lifetime.raidbots.bytes, 2048);
-  assert.equal(s.session.raidbots, undefined, 'session totals start empty');
+  assert.equal(s.lifetime['wago.tools'].bytes, 2048);
+  assert.equal(s.session['wago.tools'], undefined, 'session totals start empty');
   stats.resetLifetime();
   stats._reset();
   stats.init(dir);
-  assert.equal(stats.snapshot().lifetime.raidbots, undefined);
+  assert.equal(stats.snapshot().lifetime['wago.tools'], undefined);
   fs.rmSync(dir, { recursive: true, force: true });
 });

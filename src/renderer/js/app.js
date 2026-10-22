@@ -2,7 +2,8 @@ import { el, clear, iconUrl, toast, pct } from './util.js';
 import { hideTooltip } from './tooltip.js';
 import { renderSpecPicker } from './specPicker.js';
 import { renderProgress, castbar } from './progress.js';
-import { renderTalents, pickMap, clearSpellCache } from './talentTree.js';
+import { renderTalents, pickMap } from './talentTree.js';
+import { initWowheadTooltips, setWowheadDomain } from './wowheadTooltip.js';
 import { renderGear } from './gearView.js';
 import { renderPlayers } from './playersView.js';
 import { renderThroughput } from './throughputView.js';
@@ -71,10 +72,7 @@ function openSettings() {
     onChanged: (settings, { localeChanged }) => {
       const wclChanged = settings.wclClientId !== state.settings?.wclClientId || settings.wclHasSecret !== state.settings?.wclHasSecret;
       state.settings = settings;
-      if (localeChanged) {
-        clearSpellCache();
-        if (state.view) refreshView();
-      }
+      if (localeChanged) applyTooltipLanguage();
       if (wclChanged) {
         state.tp = null;
         if (state.tab === 'damage') renderTab();
@@ -596,12 +594,22 @@ function stopCompare() {
 }
 
 // ---------------------------------------------------------------- start-up: reopen the last results
+/** Wowhead tooltips follow the tooltip language from Settings. */
+function applyTooltipLanguage() {
+  const locale = (state.locales || []).find((l) => l.id === state.settings?.tooltipLocale);
+  setWowheadDomain(locale?.domain || '');
+}
+
 (async function boot() {
+  initWowheadTooltips();
   try {
-    state.settings = (await window.api.getSettings()).settings;
+    const res = await window.api.getSettings();
+    state.settings = res.settings;
+    state.locales = res.locales;
   } catch {
     state.settings = null;
   }
+  applyTooltipLanguage();
   const last = loadPrefs().last;
   if (last) {
     const res = await window.api.analyzeCached(last);

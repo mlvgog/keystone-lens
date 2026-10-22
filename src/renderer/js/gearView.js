@@ -1,5 +1,6 @@
-import { el, iconImg, clear, pct, qualityColor, parseItemTooltip, safeFragment, shortStat, fmtDelta, sourceText } from './util.js';
+import { el, iconImg, clear, pct, qualityColor, fmtDelta, sourceText } from './util.js';
 import { attachTooltip } from './tooltip.js';
+import { itemRef } from './wowheadTooltip.js';
 import { renderGearOverview } from './gearSummary.js';
 
 const LEFT = ['head', 'neck', 'shoulder', 'back', 'chest', 'wrist'];
@@ -25,13 +26,27 @@ function modsLine(enchants, gems) {
   return el('div.item-mods', parts.map((p, i) => [i ? '  ·  ' : '', p]));
 }
 
-function statsLine(info) {
+const STAT_LABELS = { crit: 'Crit', haste: 'Haste', mastery: 'Mastery', vers: 'Vers' };
+
+/** "141 Agility/Intellect · 100 Crit · 51 Mastery" from the item's game-table stats. */
+function statsLine(details) {
+  if (!details) return null;
   const parts = [];
-  const prim = info.primary.find((p) => !/Stamina|Armor/i.test(p.stat));
-  if (prim) parts.push(el('span.prim', `${prim.value} ${prim.stat}`));
-  for (const s of info.secondary) parts.push(el('span', `${s.value} ${shortStat(s.stat)}`));
-  if (info.sockets) parts.push(el('span.prim', `${info.sockets} socket${info.sockets > 1 ? 's' : ''}`));
+  if (details.primary?.value) parts.push(el('span.prim', `${details.primary.value.toLocaleString('en-US')} ${details.primary.name}`));
+  const secondary = Object.entries(details.stats || {})
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1]);
+  for (const [k, v] of secondary) parts.push(el('span', `${v.toLocaleString('en-US')} ${STAT_LABELS[k]}`));
+  if (details.randomStats) {
+    parts.push(el('span', { title: 'Rolled when the item dropped; hover the item for the tooltip.' }, `${details.randomStats} random secondary stat${details.randomStats > 1 ? 's' : ''}`));
+  }
+  if (details.sockets) parts.push(el('span.prim', `${details.sockets} socket${details.sockets > 1 ? 's' : ''}`));
   return parts.length ? el('div.item-stats', parts.map((p, i) => [i ? '  ·  ' : '', p])) : null;
+}
+
+/** The embellishment note of an item row (effects show in the hover tooltip). */
+function detailLines(details) {
+  return details?.embellished ? [el('div.item-effect', { style: { color: '#e6cc80' } }, 'Unique-Equipped: Embellished (2)')] : [];
 }
 
 function usageBox(item, sampleSize) {
@@ -53,18 +68,11 @@ function usageBox(item, sampleSize) {
   return box;
 }
 
-function wowheadBox(html, fallbackName, quality) {
-  return html
-    ? el('div.wh', safeFragment(html))
-    : el('div', el('div.tt-title', { style: { color: qualityColor(quality) } }, fallbackName), el('div.tt-grey', 'Tooltip unavailable'));
-}
-
 function itemRow(item, sampleSize, extras) {
-  const info = parseItemTooltip(item.tooltipEn || item.tooltip);
+  const details = item.details;
   const color = qualityColor(item.quality);
   const meta = [ilvlText(item.ilvl)];
-  if (info.track) meta.push(info.track);
-  if (info.slotType) meta.push(info.slotType);
+  if (details?.slotType) meta.push(details.slotType);
 
   const countBox = el(
     'div.item-count',
@@ -86,9 +94,8 @@ function itemRow(item, sampleSize, extras) {
         extras.yours ? el('span.tag.you', 'YOU') : null
       ),
       el('div.item-meta', meta.join('  ·  ')),
-      statsLine(info),
-      ...info.effects.slice(0, 2).map((e) => el('div.item-effect', e)),
-      ...info.extra.slice(0, 1).map((e) => el('div.item-effect', { style: { color: '#e6cc80' } }, e)),
+      statsLine(details),
+      ...detailLines(details),
       modsLine(
         item.enchants.slice(0, 2).map((e) => `${e.name} (${e.count})`),
         item.gems.slice(0, 3).map((g) => `${g.name} (${g.count})`)
@@ -97,7 +104,7 @@ function itemRow(item, sampleSize, extras) {
     countBox
   );
   if (extras.yours) row.classList.add('yours');
-  attachTooltip(row, () => [wowheadBox(item.tooltip, item.name, item.quality), usageBox(item, sampleSize)]);
+  attachTooltip(row, () => usageBox(item, sampleSize), { wowhead: () => itemRef({ id: item.id, ...item.variant }) });
   return row;
 }
 
@@ -182,17 +189,18 @@ function playerSlotPanel(group, ctx) {
   for (const it of items) {
     const color = qualityColor(it.quality);
     const popular = group.items.find((x) => x.id === it.id);
-    const statsSlot = el('div');
-    const metaLine = el('div.item-meta', `Item Level ${it.ilvl}`);
-    let tooltip = '';
+    const details = it.details;
+    const meta = [`Item Level ${it.ilvl}`];
+    if (details?.slotType) meta.push(details.slotType);
     const row = el(
       'div.item-row',
       el('div.item-icon', { style: { background: color } }, iconImg(it.icon), el('span.ilvl', String(it.ilvl))),
       el(
         'div.item-main',
         el('div.item-name', { style: { color } }, it.name, it.tier ? el('span.tag.tier', 'Tier') : null, sourceTag(it.source)),
-        metaLine,
-        statsSlot,
+        el('div.item-meta', meta.join('  ·  ')),
+        statsLine(details),
+        ...detailLines(details),
         modsLine(
           (it.enchants || []).map((e) => e.name.replace(/^Enchant [^-]+ - /, '')),
           (it.gems || []).map((g) => g.name)
@@ -205,26 +213,17 @@ function playerSlotPanel(group, ctx) {
         el('div.pbar', el('i', { style: { width: `${Math.min(100, (popular?.pct || 0) * 100)}%` } }))
       )
     );
-    attachTooltip(row, () => [
-      wowheadBox(tooltip, it.name, it.quality),
-      el(
-        'div',
-        el('div.tt-gold', popular ? `Used by ${popular.count} / ${view.sampleSize} top players (${pct(popular.pct)})` : 'Not used by any other sampled player'),
-        it.source && it.source.kind !== 'other' ? el('div.tt-cyan', sourceText(it.source, true)) : null
-      ),
-    ]);
-    const variant = { id: it.id, bonuses: it.bonuses, ilvl: it.ilvl };
-    Promise.all([window.api.itemTooltip(variant), window.api.itemTooltip(variant, { english: true })]).then(([tt, en]) => {
-      if (!tt) return;
-      tooltip = tt.tooltip || '';
-      const info = parseItemTooltip(en?.tooltip || tooltip);
-      const meta = [`Item Level ${it.ilvl}`];
-      if (info.track) meta.push(info.track);
-      if (info.slotType) meta.push(info.slotType);
-      metaLine.textContent = meta.join('  ·  ');
-      const line = statsLine(info);
-      statsSlot.replaceChildren(...[line, ...info.effects.slice(0, 2).map((e) => el('div.item-effect', e))].filter(Boolean));
-    });
+    attachTooltip(
+      row,
+      () =>
+        el(
+          'div',
+          el('div.tt-title', { style: { color } }, it.name),
+          el('div.tt-gold', popular ? `Used by ${popular.count} / ${view.sampleSize} top players (${pct(popular.pct)})` : 'Not used by any other sampled player'),
+          it.source && it.source.kind !== 'other' ? el('div.tt-cyan', sourceText(it.source, true)) : null
+        ),
+      { wowhead: () => itemRef({ id: it.id, bonuses: it.bonuses, ilvl: it.ilvl, gems: (it.gems || []).map((g) => g.id) }) }
+    );
     panel.append(row);
   }
   return panel;

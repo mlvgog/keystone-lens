@@ -33,7 +33,7 @@ Get the latest version from the [**Releases**](https://github.com/mlvgog/keyston
 
 ![Gear overview with stat profile, enchants, gems and per-slot item usage](docs/screenshots/gear.jpg)
 
-- **Items per slot.** Every slot lists the items used and how many players use each one, with the item's stats, upgrade track, effects, enchants and gems. It also shows **where the item drops**: M+ dungeon, raid boss, crafted or tier. Rings and trinkets are combined.
+- **Items per slot.** Every slot lists the items used and how many players use each one, with the item's exact stats at its item level, enchants and gems. It also shows **where the item drops**: M+ dungeon, raid boss, crafted or tier. Rings and trinkets are combined. Hover an item for its full in-game tooltip.
 - **Overview.** Secondary-stat profile, top enchant per slot, gems and embellishments, tier pieces and weapon setups.
 
 ### Players
@@ -96,8 +96,8 @@ The secret is stored only on your PC, encrypted for your Windows account, and is
 | Top-keys pages | 6 hours |
 | Player scores and key history | 1 hour |
 | Key snapshots (talents and gear per key) | forever, because they never change |
-| Item and spell tooltips, item sources | 7 days |
-| Talent trees | 1 day |
+| Item sources and types, item stat data | 7 days |
+| Talent trees | until the game build changes (checked daily) |
 | Warcraft Logs data | 30 minutes, in memory only, never on disk |
 
 Everything lives in `%APPDATA%\Keystone Lens`:
@@ -113,11 +113,17 @@ Keystone Lens has no server of its own. Your PC talks to these services directly
 | Source | Used for |
 |---|---|
 | [raider.io](https://raider.io) | Top keys, players' scores and key history, talent and gear snapshots per key, your character, dungeon, raid and realm lists. Uses the [public API](https://raider.io/api). |
-| [Wowhead](https://www.wowhead.com) | Item stats for the exact item variant, talent descriptions, item sources, icons. |
-| [raidbots](https://www.raidbots.com) | Talent tree layout. |
+| [Wowhead](https://www.wowhead.com) | Hover tooltips for items and talents, through Wowhead's [official tooltips script](https://www.wowhead.com/tooltips). Where items drop and their type, from Wowhead's documented item XML. |
+| [SimulationCraft](https://github.com/simulationcraft/simc) | Its open game data (GPL-3.0, downloaded from GitHub at runtime, not bundled): talent tree structure and item-level scaling tables. |
+| [wago.tools](https://wago.tools) | Game table exports: talent positions, connections and icons, item stat allocations and bonus IDs. |
 | [Warcraft Logs](https://www.warcraftlogs.com) | Damage and healing per dungeon, and your logged runs. Optional, with your own API client. |
+| Icon servers | Icons from raider.io's image server, with Blizzard's as a fallback. |
 
 Thanks to all of them for the data that makes this possible. Please respect their terms if you build on this project.
+
+**How talent trees and item stats are built.**
+- **Talent trees** combine SimulationCraft's talent data with wago.tools' game tables. They were checked node by node against another site's published trees and matched for all 40 specs.
+- **Item stats** are calculated the way the game does: each item's stat allocation and bonus IDs, scaled by the item-level tables. They match Wowhead's tooltips exactly.
 
 ## Privacy
 
@@ -150,10 +156,11 @@ Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md).
 | `src/main/discovery.js` | Finds a spec's players in raider.io's top keys |
 | `src/main/selection.js` | Which key represents a player |
 | `src/main/views.js` | Filtered statistics for the UI (hero tree, dungeon, build, trends) |
-| `src/main/aggregate.js`, `builds.js`, `gearSummary.js`, `itemInfo.js` | Talent and gear counting, build clustering, stat profile, stat and source parsing |
+| `src/main/aggregate.js`, `builds.js`, `gearSummary.js`, `itemInfo.js` | Talent and gear counting, build clustering, stat profile, item source parsing |
 | `src/main/throughput.js` | Damage and healing statistics |
 | `src/main/history.js`, `settings.js`, `stats.js`, `cache.js` | Trend snapshots, settings, download statistics, cache |
-| `src/main/sources/` | raider.io, raidbots, Wowhead and Warcraft Logs clients |
+| `src/main/sources/` | raider.io, Wowhead (item XML), Warcraft Logs clients; `talentTrees.js` and `itemData.js` build talent trees and item stats from SimulationCraft and wago.tools data |
+| `src/renderer/wowhead-frame.html` | Sandboxed frame for Wowhead's tooltips script (run `node scripts/update-frame-hash.js` after editing its inline script) |
 | `src/renderer/` | UI (plain HTML, CSS and ES modules) |
 
 ## Contributing
@@ -162,7 +169,7 @@ Bug reports and ideas are welcome in [Issues](https://github.com/mlvgog/keystone
 
 ## Disclaimer
 
-Keystone Lens is a free, non-commercial fan project. It is not affiliated with or endorsed by Blizzard Entertainment, raider.io, Wowhead, raidbots or Warcraft Logs. World of Warcraft and Warcraft are trademarks or registered trademarks of Blizzard Entertainment, Inc. in the U.S. and/or other countries. Game data and icons belong to their respective owners.
+Keystone Lens is a free, non-commercial fan project. It is not affiliated with or endorsed by Blizzard Entertainment, raider.io, Wowhead, Warcraft Logs, SimulationCraft or wago.tools. World of Warcraft and Warcraft are trademarks or registered trademarks of Blizzard Entertainment, Inc. in the U.S. and/or other countries. Game data and icons belong to their respective owners.
 
 ## License
 

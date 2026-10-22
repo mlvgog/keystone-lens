@@ -2,12 +2,13 @@
 
 const cache = require('./cache');
 const raiderio = require('./sources/raiderio');
-const raidbots = require('./sources/raidbots');
+const talentTrees = require('./sources/talentTrees');
+const itemData = require('./sources/itemData');
 const wowhead = require('./sources/wowhead');
 const { buildCandidates, mostRecentCandidate, findMember, maxVersion, selectRun } = require('./selection');
 const { createDiscovery, poolTarget, rankByScore, specIndexOf } = require('./discovery');
 const { heroSubTrees, variantKeyOf, gearItems } = require('./aggregate');
-const { parseStats, isEmbellished, droppedBy, classifySource } = require('./itemInfo');
+const { classifySource } = require('./itemInfo');
 
 const PHASES = [
   { name: 'Loading talent data', weight: 3 },
@@ -18,7 +19,7 @@ const PHASES = [
   { name: 'Building report', weight: 4 },
 ];
 
-const SESSION_VERSION = 4;
+const SESSION_VERSION = 6;
 const RECENT_PROBES = 10;
 const ARMORY_LOCALE = { us: 'en-us', eu: 'en-gb', kr: 'ko-kr', tw: 'zh-tw' };
 
@@ -105,7 +106,7 @@ function trimTree(tree) {
       maxRanks: e.maxRanks,
     })),
   });
-  // raidbots occasionally ships empty placeholder nodes (no name, empty entry) far outside the tree.
+  // Guard against placeholder nodes without a real entry.
   const real = (n) => (n.entries || []).some((e) => e.id);
   return {
     classNodes: tree.classNodes.filter(real).map(trimNode),
@@ -168,8 +169,9 @@ function runGetter(seasonSlug, signal) {
 }
 
 /**
- * Look up every item variant the session uses that has not been looked up yet:
- * secondary stats + embellishment (from English tooltips) and where the item comes from.
+ * Look up every item variant the session uses that has not been looked up yet: where the item
+ * comes from and its type (Wowhead's item XML), and its stats and embellishment at the variant's
+ * item level (game tables).
  */
 async function enrichItems(session, { signal, progress }) {
   session.itemInfo ||= {};
@@ -186,27 +188,26 @@ async function enrichItems(session, { signal, progress }) {
       }
     }
   }
-  progress.setTotal(variants.size + items.size);
+  progress.setTotal(items.size + (variants.size ? 1 : 0));
   const raids = items.size ? await raiderio.getRaids(session.meta.season.expansionId || 11, { signal }) : [];
 
   await Promise.all(
-    [...variants].map(async ([key, it]) => {
-      const tt = await wowhead.getItemTooltip(it, { signal, locale: 0 });
-      session.itemInfo[key] = { stats: parseStats(tt.tooltip), embellished: isEmbellished(tt.tooltip), boss: droppedBy(tt.tooltip) };
-      progress.step(it.name);
-    })
-  );
-  const bossOf = (id) => Object.entries(session.itemInfo).find(([k, v]) => k.startsWith(`${id}|`) && v.boss)?.[1].boss || null;
-  await Promise.all(
     [...items].map(async ([id, it]) => {
-      const src = await wowhead.getItemSource(id, { signal });
+      const src = await wowhead.getItemXml(id, { signal });
       session.itemSources[id] = {
-        ...classifySource({ tier: !!it.tier, src, boss: bossOf(id), seasonDungeons: session.meta.dungeons, raids }),
+        ...classifySource({ tier: !!it.tier, src, boss: src.droppedBy, seasonDungeons: session.meta.dungeons, raids }),
         slot: src.slot ?? null,
+        slotType: src.slotType,
       };
       progress.step(it.name);
     })
   );
+  if (!variants.size) return;
+
+  const list = [...variants].map(([key, it]) => ({ key, id: it.id, bonuses: it.bonuses, ilvl: it.ilvl }));
+  const described = await itemData.describeVariants(list, { signal });
+  for (const v of list) session.itemInfo[v.key] = described[v.key] || { stats: null, primary: null, stamina: 0, sockets: 0, embellished: false };
+  progress.step('Item stats');
 }
 
 /**
@@ -231,8 +232,8 @@ async function analyze(opts, { signal, onProgress, force = false, allowStale = f
   const progress = new Progress(onProgress);
 
   // 1. Static data
-  progress.phase(0, 2, 'Talent trees (raidbots)');
-  const talentData = await raidbots.getTalentData({ signal });
+  progress.phase(0, 2, 'Talent trees (SimulationCraft + wago.tools)');
+  const talentData = await talentTrees.getTalentData({ signal });
   const tree = talentData.find((t) => t.specId === specId);
   if (!tree) throw new Error(`No talent tree data for ${specName} ${className}`);
   progress.step('Current season (raider.io)');
@@ -407,7 +408,7 @@ async function analyze(opts, { signal, onProgress, force = false, allowStale = f
   };
 
   // 5. Item data: stats, embellishments, sources
-  progress.phase(4, 0, 'Item data (wowhead)');
+  progress.phase(4, 0, 'Item data (Wowhead item XML + game tables)');
   await enrichItems(session, { signal, progress });
 
   progress.phase(5, 1, 'Building report');
@@ -454,7 +455,7 @@ async function loadDungeon(session, zoneId, { signal, onProgress } = {}) {
         progress.step(p.name);
       })
     );
-    progress.phase(1, 0, 'Item data (wowhead)');
+    progress.phase(1, 0, 'Item data (Wowhead item XML + game tables)');
     await enrichItems(session, { signal, progress });
   } catch (err) {
     for (const p of session.players) if (p.dungeons) delete p.dungeons[zoneId];

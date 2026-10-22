@@ -433,58 +433,6 @@ input.wow-input::-webkit-calendar-picker-indicator {
   height: 30px;
   flex: 0 0 auto;
 }
-.game-tooltip .tt-desc {
-  color: var(--gold);
-}
-
-/* wowhead tooltip markup */
-.wh table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.wh td,
-.wh th {
-  padding: 0;
-  vertical-align: top;
-  font-weight: normal;
-  text-align: left;
-}
-.wh th {
-  text-align: right;
-}
-.wh b {
-  font-weight: normal;
-}
-.wh .whtt-name,
-.wh b.q0, .wh b.q1, .wh b.q2, .wh b.q3, .wh b.q4, .wh b.q5, .wh b.q6, .wh b.q7 {
-  font-size: 15px;
-}
-.wh .q {
-  color: var(--gold);
-}
-.wh .q0 { color: var(--q0); }
-.wh .q1 { color: var(--q1); }
-.wh .q2 { color: var(--q2); }
-.wh .q3 { color: var(--q3); }
-.wh .q4 { color: var(--q4); }
-.wh .q5 { color: var(--q5); }
-.wh .q6 { color: var(--q6); }
-.wh .q7 { color: var(--q7); }
-.wh .q8 { color: #ffff98; }
-.wh .q9 { color: #71d5ff; }
-.wh .q10 { color: #ff4040; }
-.wh .whtt-sellprice,
-.wh .wowhead-tooltip-requirements {
-  display: none;
-}
-.wh .whtt-extra {
-  color: #a0b4d0;
-  font-size: 12px;
-}
-.wh .indent {
-  padding-left: 10px;
-}
-
 /* ------------------------------------------------------------------ spec picker */
 .picker {
   flex: 1 1 auto;
@@ -2269,4 +2217,16 @@ table.dev-table {
 
 .tp-warn {
   margin: 12px 0 0;
+}
+
+/* Wowhead's official tooltips run in this sandboxed layer (wowhead-frame.html), above everything. */
+.wowhead-layer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+  z-index: 1001;
 }

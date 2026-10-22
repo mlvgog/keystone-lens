@@ -69,7 +69,7 @@ function slugify(name) {
     .replace(/^-|-$/g, '');
 }
 
-/** Class list with specs, derived from the raidbots talent data so new specs show up automatically. */
+/** Class list with specs, derived from the talent tree data so new specs show up automatically. */
 function buildClassList(talentData) {
   const classes = new Map();
   for (const tree of talentData) {

@@ -1,0 +1,83 @@
+<!doctype html>
+<!--
+  Hosts Wowhead's official tooltips script (https://www.wowhead.com/tooltips) in a sandboxed
+  frame over the window: the script cannot reach the app, and the app only sends it what to show.
+  The inline script below is allowed by its hash; test/wowheadFrame.test.js keeps the two in sync.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'sha256-1/oYOA2LyYc22KSBI4OXt6VebnYiKxqzSISlQtIQ1qk=' https://wow.zamimg.com https://nether.wowhead.com; style-src 'unsafe-inline' https://wow.zamimg.com; img-src https://wow.zamimg.com data:; font-src https://wow.zamimg.com; connect-src https://nether.wowhead.com https://www.wowhead.com"
+    />
+    <style>
+      /* Same color scheme as the window, or Chromium paints the frame opaque. */
+      :root { color-scheme: dark; }
+      html, body { margin: 0; background: transparent; overflow: hidden; }
+      /* Wowhead's box is a see-through texture; over the app it needs a solid backing. */
+      .wowhead-tooltip > table { background-color: #070a1c; border-radius: 4px; }
+      #link { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; }
+    </style>
+    <script>
+var whTooltips = { colorLinks: false, iconizeLinks: false, renameLinks: false };
+(function () {
+  var shown = null;
+  var anchor = null;
+  function link() { return document.getElementById('link'); }
+  function tooltip() {
+    var list = document.querySelectorAll('.wowhead-tooltip');
+    for (var i = 0; i < list.length; i++) if (list[i].offsetWidth > 0 && getComputedStyle(list[i]).visibility !== 'hidden') return list[i];
+    return null;
+  }
+  function fire(type) {
+    var x = anchor ? anchor.right : 0;
+    var y = anchor ? anchor.top : 0;
+    link().dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y }));
+  }
+  // Keep Wowhead's box beside the app's own tooltip box (right of it, or left when there is no room).
+  function place() {
+    if (!shown) return;
+    var t = tooltip();
+    if (t && anchor) {
+      var w = t.offsetWidth;
+      var h = t.offsetHeight;
+      var left = anchor.right + 8;
+      if (left + w > window.innerWidth - 6) left = Math.max(6, anchor.left - w - 8);
+      var top = Math.max(6, Math.min(anchor.top, window.innerHeight - h - 6));
+      t.style.left = left + 'px';
+      t.style.top = top + 'px';
+    }
+    requestAnimationFrame(place);
+  }
+  window.addEventListener('message', function (e) {
+    if (e.source !== parent) return;
+    var m = e.data || {};
+    if (m.type === 'show' && typeof m.what === 'string' && /^(item|spell)=[\w:&=.-]+$/.test(m.what)) {
+      if (shown) fire('mouseout');
+      anchor = m.anchor || null;
+      link().setAttribute('data-wowhead', m.what);
+      shown = m.what;
+      fire('mouseover');
+      fire('mousemove');
+      requestAnimationFrame(place);
+    } else if (m.type === 'move') {
+      anchor = m.anchor || anchor;
+    } else if (m.type === 'hide' && shown) {
+      fire('mouseout');
+      shown = null;
+      var t = tooltip();
+      if (t) t.style.visibility = 'hidden';
+    }
+  });
+  window.addEventListener('load', function () {
+    parent.postMessage({ type: 'ready' }, '*');
+  });
+})();
+</script>
+    <script src="https://wow.zamimg.com/js/tooltips.js"></script>
+  </head>
+  <body>
+    <a id="link" href="#">&nbsp;</a>
+  </body>
+</html>

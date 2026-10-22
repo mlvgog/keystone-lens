@@ -1,7 +1,8 @@
 // Shared renderer helpers.
 
-const ICON_BASE = 'https://wow.zamimg.com/images/wow/icons/large/';
-const ICON_FALLBACK = 'https://cdn.raiderio.net/images/wow/icons/large/';
+// Icon image servers: raider.io's (the one its API links to), then Blizzard's own.
+const ICON_SOURCES = ['https://cdn.raiderio.net/images/wow/icons/large/', 'https://render.worldofwarcraft.com/us/icons/56/'];
+const QUESTION_MARK = 'inv_misc_questionmark';
 
 export const QUALITY_COLORS = ['#9d9d9d', '#ffffff', '#1eff00', '#0070dd', '#a335ee', '#ff8000', '#e6cc80', '#00ccff'];
 
@@ -9,20 +10,8 @@ export function qualityColor(q) {
   return QUALITY_COLORS[q] || '#ffffff';
 }
 
-const spellIconCache = new Map();
-/** Wowhead's own icon name for a spell (raidbots sometimes uses '_' where wowhead uses '-'). */
-function spellIcon(spellId) {
-  if (!spellIconCache.has(spellId)) {
-    spellIconCache.set(spellId, window.api.spellTooltip(spellId).then((t) => t?.icon || null).catch(() => null));
-  }
-  return spellIconCache.get(spellId);
-}
-
-/**
- * <img> for a WoW icon name. Falls back to wowhead's icon name for the spell (when a
- * spellId is given), then the raider.io CDN, then the question mark.
- */
-export function iconImg(name, { size, cls, spellId } = {}) {
+/** <img> for a WoW icon name; tries each icon server, then shows the question mark. */
+export function iconImg(name, { size, cls } = {}) {
   const img = document.createElement('img');
   img.alt = '';
   img.loading = 'lazy';
@@ -32,25 +21,12 @@ export function iconImg(name, { size, cls, spellId } = {}) {
     img.width = size;
     img.height = size;
   }
-  const icon = (name || 'inv_misc_questionmark').toLowerCase();
-  const attempts = [() => ICON_BASE + icon + '.jpg'];
-  if (spellId) {
-    attempts.push(async () => {
-      const alt = await spellIcon(spellId);
-      return alt && alt.toLowerCase() !== icon ? ICON_BASE + alt.toLowerCase() + '.jpg' : null;
-    });
-  }
-  attempts.push(() => ICON_FALLBACK + icon + '.jpg', () => ICON_BASE + 'inv_misc_questionmark.jpg');
+  const icon = (name || QUESTION_MARK).toLowerCase();
+  const attempts = [...ICON_SOURCES.map((base) => base + icon + '.jpg'), ICON_SOURCES[0] + QUESTION_MARK + '.jpg'];
   let i = 0;
-  const next = async () => {
-    while (i < attempts.length) {
-      const url = await attempts[i++]();
-      if (url) {
-        img.src = url;
-        return;
-      }
-    }
-    img.removeEventListener('error', next);
+  const next = () => {
+    if (i < attempts.length) img.src = attempts[i++];
+    else img.removeEventListener('error', next);
   };
   img.addEventListener('error', next);
   next();
@@ -58,7 +34,7 @@ export function iconImg(name, { size, cls, spellId } = {}) {
 }
 
 export function iconUrl(name) {
-  return ICON_BASE + (name || 'inv_misc_questionmark').toLowerCase() + '.jpg';
+  return ICON_SOURCES[0] + (name || QUESTION_MARK).toLowerCase() + '.jpg';
 }
 
 /** Tiny DOM builder: el('div.cls#id', {attrs}, children...) */
@@ -95,70 +71,6 @@ export function pct(x, digits = 0) {
 export function clear(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
   return node;
-}
-
-const SANITIZE = {
-  ALLOWED_TAGS: ['table', 'tbody', 'thead', 'tr', 'td', 'th', 'span', 'b', 'i', 'u', 'br', 'div', 'small', 'em', 'strong', 'ul', 'li', 'p'],
-  ALLOWED_ATTR: ['class', 'width'],
-  KEEP_CONTENT: true,
-};
-
-/** Sanitised DOM fragment for third-party (wowhead) tooltip HTML. */
-export function safeFragment(html) {
-  const clean = window.DOMPurify.sanitize(String(html || ''), { ...SANITIZE, RETURN_DOM_FRAGMENT: true });
-  return clean;
-}
-
-/** Wowhead tooltip HTML as plain text lines. */
-export function tooltipLines(html) {
-  const prepared = String(html || '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<table/gi, '\n<table')
-    .replace(/<\/(tr|div|table|p|li)>/gi, '\n</$1>')
-    .replace(/<\/(td|th)>/gi, ' </$1>');
-  const frag = safeFragment(prepared);
-  return (frag.textContent || '')
-    .split('\n')
-    .map((l) => l.replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
-}
-
-const SECONDARY = /^\+?([\d,]+)\s+(Critical Strike|Haste|Mastery|Versatility|Leech|Avoidance|Speed|Indestructible)$/i;
-const PRIMARY = /^\+?([\d,]+)\s+(\[[^\]]+\]|Agility|Strength|Intellect|Stamina|Armor)$/i;
-
-/** Pull the interesting bits out of an item tooltip for the compact item row. */
-export function parseItemTooltip(html) {
-  const lines = tooltipLines(html);
-  const out = { primary: [], secondary: [], effects: [], track: null, slotType: null, sockets: 0, extra: [] };
-  for (const line of lines) {
-    let m;
-    if ((m = SECONDARY.exec(line))) out.secondary.push({ value: m[1], stat: m[2] });
-    else if ((m = PRIMARY.exec(line))) out.primary.push({ value: m[1], stat: m[2].replace(/^\[|\]$/g, '').replace(/ or /g, '/') });
-    else if (/^(Equip|Use|Chance on hit):/i.test(line)) out.effects.push(line);
-    else if (/^Upgrade Level:/i.test(line)) out.track = line.replace(/^Upgrade Level:\s*/i, '');
-    else if (/Socket$/i.test(line)) out.sockets++;
-    else if (/^Embellish|^Crafted|Crafting Quality|^Unique-Equipped: Embellished/i.test(line)) out.extra.push(line);
-  }
-  // The slot / armour type line, e.g. "Head Cloth", "Two-Hand Staff", "One-Hand Dagger"
-  const slotLine = lines.find((l) =>
-    /^(Head|Neck|Shoulder|Back|Chest|Wrist|Hands|Waist|Legs|Feet|Finger|Trinket|One-Hand|Two-Hand|Main Hand|Off Hand|Held In Off-hand|Ranged)\b/i.test(l)
-  );
-  if (slotLine) out.slotType = slotLine;
-  return out;
-}
-
-const SHORT_STAT = {
-  'Critical Strike': 'Crit',
-  Haste: 'Haste',
-  Mastery: 'Mastery',
-  Versatility: 'Vers',
-  Leech: 'Leech',
-  Avoidance: 'Avoidance',
-  Speed: 'Speed',
-  Indestructible: 'Indestructible',
-};
-export function shortStat(stat) {
-  return SHORT_STAT[stat] || stat;
 }
 
 export function relDate(iso) {

@@ -319,7 +319,10 @@ export async function settingsDialog({ onChanged }) {
       el(
         'div.about',
         el('div.setting-row', el('div.wow-header', `About · Keystone Lens ${version}`), dev),
-        el('p.dim.small', 'Players, keys and talent/gear snapshots: raider.io · Talent tree layout: raidbots · Item and spell tooltips, item sources: Wowhead · Damage and healing: Warcraft Logs.'),
+        el(
+          'p.dim.small',
+          'Players, keys and talent/gear snapshots: raider.io · Tooltips and item sources: Wowhead · Talent trees and item stats: SimulationCraft and wago.tools game data · Damage and healing: Warcraft Logs.'
+        ),
         el(
           'p.dim.small',
           el('button.link-btn', { onclick: () => window.api.openExternal(REPO_URL) }, 'Source code and releases on GitHub'),
@@ -327,7 +330,7 @@ export async function settingsDialog({ onChanged }) {
         ),
         el(
           'p.faint.small',
-          'Not affiliated with or endorsed by Blizzard Entertainment, raider.io, raidbots, Wowhead or Warcraft Logs. World of Warcraft and Warcraft are trademarks or registered trademarks of Blizzard Entertainment, Inc.'
+          'Not affiliated with or endorsed by Blizzard Entertainment, raider.io, Wowhead, Warcraft Logs, SimulationCraft or wago.tools. World of Warcraft and Warcraft are trademarks or registered trademarks of Blizzard Entertainment, Inc.'
         )
       )
     ),
@@ -342,8 +345,9 @@ const KIND_LABELS = {
   character: 'Compared characters',
   season: 'Season, dungeon & raid lists',
   realms: 'Realm lists',
-  itemTooltip: 'Item tooltips',
-  spellTooltip: 'Talent descriptions',
+  itemData: 'Item stat allocations',
+  itemBonus: 'Item bonus IDs',
+  gameTables: 'Item-level scaling tables',
   itemSource: 'Item sources',
   talents: 'Talent trees',
   analysis: 'Finished analyses',

@@ -1,6 +1,6 @@
 'use strict';
 
-const { aggregateTalents, aggregateGear } = require('./aggregate');
+const { aggregateTalents, aggregateGear, variantKeyOf } = require('./aggregate');
 const { clusterBuilds, buildDiffs } = require('./builds');
 const { statProfile, summarizeGear } = require('./gearSummary');
 const history = require('./history');
@@ -28,9 +28,7 @@ function normalizeFilters(filters = {}) {
 /**
  * Talent, gear and player statistics for a filtered part of a session.
  * filters: { dungeon: zoneId|null, hero: subTreeId|null, build: buildId|null, trendsSince: snapshotId|null }
- * deps: { getTooltip(variant) -> { tooltip, icon }, getEnglishTooltip(variant) (only when tooltips
- *         are shown in another language; compact item rows parse English text),
- *         getSnapshot(id) -> snapshot|null }
+ * deps: { getSnapshot(id) -> snapshot|null }
  */
 async function buildView(session, filters, deps = {}) {
   const f = normalizeFilters(filters);
@@ -69,19 +67,15 @@ async function buildView(session, filters, deps = {}) {
 
   const talents = filtered === base ? baseTalents : aggregateTalents(tree, agg);
   const gear = aggregateGear(agg);
-  await Promise.all(
-    gear.flatMap((g) =>
-      g.items.map(async (item) => {
-        item.source = session.itemSources?.[item.id] || null;
-        if (!deps.getTooltip) return;
-        const variant = { id: item.id, bonuses: item.variant.bonuses, ilvl: item.variant.ilvl };
-        const tt = await deps.getTooltip(variant);
-        item.tooltip = tt?.tooltip || '';
-        if (deps.getEnglishTooltip) item.tooltipEn = (await deps.getEnglishTooltip(variant))?.tooltip || '';
-        if ((!item.icon || item.icon === 'inv_misc_questionmark') && tt?.icon) item.icon = tt.icon;
-      })
-    )
-  );
+  for (const g of gear) {
+    for (const item of g.items) {
+      const src = session.itemSources?.[item.id] || null;
+      item.source = src;
+      // Stats, sockets and embellishment of the most common variant (see collector.enrichItems).
+      const info = session.itemInfo?.[variantKeyOf({ id: item.id, bonuses: item.variant.bonuses, ilvl: item.variant.ilvl })] || null;
+      item.details = info || src ? { ...info, slotType: src?.slotType || null } : null;
+    }
+  }
 
   const players = filtered.map(({ p, index, d }) => ({
     index,
@@ -135,7 +129,11 @@ function playerDetail(session, index, dungeon = null) {
   const d = dataFor(p, dungeon);
   if (!d) return null;
   const items = Object.fromEntries(
-    Object.entries(d.items || {}).map(([slot, it]) => [slot, { ...it, source: session.itemSources?.[it.id] || null }])
+    Object.entries(d.items || {}).map(([slot, it]) => {
+      const source = session.itemSources?.[it.id] || null;
+      const info = session.itemInfo?.[variantKeyOf(it)] || null;
+      return [slot, { ...it, source, details: info ? { ...info, slotType: source?.slotType || null } : null }];
+    })
   );
   return {
     index,

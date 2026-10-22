@@ -32,7 +32,7 @@ function allTreeNodes(tree) {
   return [...(tree.classNodes || []), ...(tree.specNodes || []), ...(tree.heroNodes || [])];
 }
 
-/** Hero sub-trees of a raw raidbots tree, or the already-derived list of a trimmed tree. */
+/** Hero sub-trees of a full talent tree, or the already-derived list of a trimmed tree. */
 function heroSubTrees(tree) {
   if (Array.isArray(tree.subTrees)) return tree.subTrees;
   const selector = (tree.subTreeNodes || [])[0];

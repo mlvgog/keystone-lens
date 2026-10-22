@@ -13,7 +13,7 @@ Everything is stored in `%APPDATA%\Keystone Lens`. Nothing is uploaded.
 | Settings: language, default region, player count | `settings.json` | |
 | Your Warcraft Logs client ID and secret (optional) | `settings.json` | The secret is encrypted with Windows' per-user encryption (DPAPI) and can't be read by other Windows accounts. |
 | Characters you load in "Compare with my character" (region, realm, name, class) | the app's local storage | Up to 12, so you can load them again with one click. |
-| Cached public data from raider.io, Wowhead and raidbots | `data-cache` | Clear it in ⚙ Settings → Clear cache. |
+| Cached public data from raider.io, Wowhead, wago.tools and SimulationCraft | `data-cache` | Clear it in ⚙ Settings → Clear cache. |
 | Trend history (pick rates of earlier searches) | `history` | |
 | Download statistics for the developer menu | `stats.json` | Request counts and sizes per source. |
 
@@ -26,14 +26,15 @@ The app talks directly to these services, only to fetch the data it shows:
 | Service | What is sent | Their privacy policy |
 |---|---|---|
 | raider.io (`raider.io`, `cdn.raiderio.net`) | Requests for public M+ data and images. With "Compare with my character", the region, realm and name you enter. | [raider.io privacy policy](https://raider.io/privacy-policy) |
-| Wowhead (`wowhead.com`, `wow.zamimg.com`) | Item and spell IDs for tooltips, and icon downloads. | [Wowhead privacy policy](https://www.wowhead.com/privacy) |
-| raidbots | A request for the public talent-tree data file. | [raidbots privacy policy](https://www.raidbots.com/privacy) |
+| Wowhead (`www.wowhead.com`, `nether.wowhead.com`, `wow.zamimg.com`) | Item IDs for the item XML. When you hover an item or talent, Wowhead's tooltips script loads and requests that item or spell. | [Wowhead privacy policy](https://www.wowhead.com/privacy) |
+| wago.tools | Requests for public game tables (talent and item data). | [wago.tools privacy policy](https://wago.tools/privacy-policy) |
+| GitHub (`raw.githubusercontent.com`) | Downloads of SimulationCraft's public game data files. | [GitHub privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) |
+| Blizzard (`render.worldofwarcraft.com`) | Icon downloads, when raider.io's image server lacks an icon. | Blizzard's privacy policy |
 | Warcraft Logs (optional) | Your client ID and secret, to get an access token. Requests for public rankings. With "Compare with my character", the region, realm and name you enter. | [Archon (RPGLogs) privacy policy](https://archon.gg/privacy-policy) |
-| GitHub | Nothing, unless you click the "Source code and releases" link, which opens your browser. | |
 
-Like any internet request, these services can see your IP address. Every request carries a User-Agent of the form `KeystoneLens/<version> (desktop app; +https://github.com/mlvgog/keystone-lens)` so the services know which app is calling. It contains nothing about you.
+Like any internet request, these services can see your IP address. Data requests carry a User-Agent of the form `KeystoneLens/<version> (desktop app; +https://github.com/mlvgog/keystone-lens)` so the services know which app is calling. It contains nothing about you. Icons and Wowhead's tooltips script are loaded by the app's window the way a web page loads them.
 
-Links in the app (raider.io profiles, Warcraft Logs reports, the Armory) open in your normal web browser.
+Links in the app (raider.io profiles, Warcraft Logs reports, the Armory, the GitHub page) open in your normal web browser.
 
 ## Deleting your data
 

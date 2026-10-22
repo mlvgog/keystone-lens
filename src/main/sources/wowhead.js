@@ -1,72 +1,40 @@
 'use strict';
 
-const { fetchJson, fetchText } = require('../http');
+const { fetchText } = require('../http');
 const cache = require('../cache');
-const { parseSourceXml } = require('../itemInfo');
+const { parseItemXml } = require('../itemInfo');
 
-const BASE = 'https://nether.wowhead.com/tooltip';
+/**
+ * Wowhead, used only the ways Wowhead offers it to other sites (www.wowhead.com/tooltips):
+ * - the documented item XML (www.wowhead.com/item=ID&xml) for where an item drops and its type;
+ * - the official tooltips script for hover tooltips, which runs in the window (wowhead-frame.html).
+ */
 
-/** Wowhead tooltip languages (locale ids used by the tooltip API). */
+/** Tooltip languages: the Wowhead domain each one uses with the tooltips script. */
 const LOCALES = [
-  { id: 0, name: 'English' },
-  { id: 3, name: 'Deutsch' },
-  { id: 2, name: 'Français' },
-  { id: 6, name: 'Español' },
-  { id: 9, name: 'Italiano' },
-  { id: 8, name: 'Português' },
-  { id: 7, name: 'Русский' },
-  { id: 1, name: '한국어' },
-  { id: 4, name: '简体中文' },
+  { id: 0, name: 'English', domain: '' },
+  { id: 3, name: 'Deutsch', domain: 'de' },
+  { id: 2, name: 'Français', domain: 'fr' },
+  { id: 6, name: 'Español', domain: 'es' },
+  { id: 9, name: 'Italiano', domain: 'it' },
+  { id: 8, name: 'Português', domain: 'pt' },
+  { id: 7, name: 'Русский', domain: 'ru' },
+  { id: 1, name: '한국어', domain: 'ko' },
+  { id: 4, name: '简体中文', domain: 'cn' },
 ];
 
-let displayLocale = 0;
-
-/** Language used for tooltips shown to the user. Data parsing always uses English. */
-function setLocale(locale) {
-  displayLocale = LOCALES.some((l) => l.id === locale) ? locale : 0;
-}
-
-function getLocale() {
-  return displayLocale;
-}
-
-/** Item tooltip (name, quality, icon, tooltip HTML) for an exact item variant. */
-async function getItemTooltip({ id, bonuses = [], ilvl }, { signal, locale = displayLocale } = {}) {
-  const params = new URLSearchParams({ dataEnv: '1', locale: String(locale) });
-  if (bonuses.length) params.set('bonus', bonuses.join(':'));
-  if (ilvl) params.set('ilvl', String(ilvl));
-  const url = `${BASE}/item/${id}?${params}`;
-  return cache.cached('itemTooltip', url, async () => {
-    try {
-      const d = await fetchJson(url, { signal });
-      return { name: d.name, quality: d.quality, icon: d.icon, tooltip: d.tooltip || '' };
-    } catch (err) {
-      if (err.name === 'AbortError') throw err;
-      return { name: null, quality: null, icon: null, tooltip: '', error: err.message };
-    }
-  });
-}
-
-/** Spell tooltip (used for talent descriptions). */
-async function getSpellTooltip(spellId, { signal, locale = displayLocale } = {}) {
-  const url = `${BASE}/spell/${spellId}?dataEnv=1&locale=${locale}`;
-  return cache.cached('spellTooltip', url, async () => {
-    const d = await fetchJson(url, { signal });
-    return { name: d.name, icon: d.icon, tooltip: d.tooltip || '' };
-  });
-}
-
-/** Where an item comes from: `{ source: [codes], more: [...] }` from wowhead's item XML. */
-async function getItemSource(id, { signal } = {}) {
+/** Item facts from the item XML (see itemInfo.parseItemXml); cached for a week. */
+async function getItemXml(id, { signal } = {}) {
   const url = `https://www.wowhead.com/item=${id}&xml`;
-  return cache.cached('itemSource', url, async () => {
+  // v2: parsed with item type and boss (older cache entries only had the source).
+  return cache.cached('itemSource', `${url}|v2`, async () => {
     try {
-      return parseSourceXml(await fetchText(url, { signal }));
+      return parseItemXml(await fetchText(url, { signal }));
     } catch (err) {
       if (err.name === 'AbortError') throw err;
-      return { source: [], more: [], error: err.message };
+      return { ...parseItemXml(''), error: err.message };
     }
   });
 }
 
-module.exports = { LOCALES, setLocale, getLocale, getItemTooltip, getSpellTooltip, getItemSource };
+module.exports = { LOCALES, getItemXml };

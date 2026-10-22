@@ -1,12 +1,10 @@
 'use strict';
 
 /**
- * Parsing of wowhead item data (English tooltips + item XML) into the facts the gear
- * summary needs: secondary stats, embellishments and where an item comes from.
+ * Item facts for the gear views: where an item comes from and its type, from Wowhead's
+ * documented item XML, plus raider.io gem names. Stats come from the game tables (sources/itemData).
  */
 
-// <!--rtgNN--> markers in wowhead tooltips: rating ids of the secondary stats.
-const RATING = { 32: 'crit', 36: 'haste', 49: 'mastery', 40: 'vers' };
 const GEM_STAT = { crit: 'crit', haste: 'haste', mast: 'mastery', mastery: 'mastery', vers: 'vers', versatility: 'vers' };
 const PROFESSIONS = {
   164: 'Blacksmithing',
@@ -26,16 +24,6 @@ function emptyStats() {
   return { crit: 0, haste: 0, mastery: 0, vers: 0 };
 }
 
-/** Secondary stat ratings of an item tooltip. */
-function parseStats(html) {
-  const out = emptyStats();
-  for (const m of String(html || '').matchAll(/<!--rtg(\d+)-->([\d,]+)/g)) {
-    const key = RATING[m[1]];
-    if (key) out[key] += Number(m[2].replace(/,/g, ''));
-  }
-  return out;
-}
-
 /** Secondary stats from a raider.io gem name such as "16 Mast & 7 Crit". */
 function gemStats(name) {
   const out = emptyStats();
@@ -45,26 +33,55 @@ function gemStats(name) {
   return out;
 }
 
-function isEmbellished(html) {
-  return /Embellished/i.test(String(html || ''));
+const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'" };
+
+function decodeEntities(text) {
+  return text.replace(/&(#\d+|#x[\da-f]+|[a-z]+);/gi, (m, e) => {
+    if (ENTITIES[e.toLowerCase()] !== undefined) return ENTITIES[e.toLowerCase()];
+    if (e[0] === '#') return String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : Number(e.slice(1)));
+    return m;
+  });
 }
 
-/** Boss name from the tooltip's "Dropped by: X" line. */
-function droppedBy(html) {
-  const m = /Dropped by:\s*([^<]+)</i.exec(String(html || ''));
-  return m ? m[1].trim() : null;
+/** Markup -> text lines. */
+function htmlLines(html) {
+  return decodeEntities(
+    String(html || '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(tr|div|table|p|li)>/gi, '\n')
+      .replace(/<\/(td|th)>/gi, ' ')
+      .replace(/<[^>]+>/g, '')
+  )
+    .split('\n')
+    .map((l) => l.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
 }
 
-/** `{ source: [codes], more: [...], slot }` from wowhead's item XML. */
-function parseSourceXml(xml) {
-  const m = /<json><!\[CDATA\[([\s\S]*?)\]\]><\/json>/.exec(String(xml || ''));
-  if (!m) return { source: [], more: [], slot: null };
-  try {
-    const data = JSON.parse(`{${m[1]}}`);
-    return { source: data.source || [], more: data.sourcemore || [], slot: data.slot ?? null };
-  } catch {
-    return { source: [], more: [], slot: null };
+/**
+ * Wowhead's documented item XML (www.wowhead.com/item=ID&xml, English):
+ * { source: [codes], more: [...], slot, slotType, droppedBy }.
+ */
+function parseItemXml(xml) {
+  const text = String(xml || '');
+  const out = { source: [], more: [], slot: null, slotType: null, droppedBy: null };
+  const json = /<json><!\[CDATA\[([\s\S]*?)\]\]><\/json>/.exec(text);
+  if (json) {
+    try {
+      const data = JSON.parse(`{${json[1]}}`);
+      out.source = data.source || [];
+      out.more = data.sourcemore || [];
+      out.slot = data.slot ?? null;
+    } catch {
+      // keep the empty source
+    }
   }
+  const tooltip = /<htmlTooltip><!\[CDATA\[([\s\S]*?)\]\]><\/htmlTooltip>/.exec(text)?.[1] || '';
+  const slotRow = /<table width="100%"><tr><td>([\s\S]*?)<\/td><th>([\s\S]*?)<\/th>/.exec(tooltip);
+  if (slotRow) out.slotType = htmlLines(`${slotRow[1]} ${slotRow[2]}`).join(' ') || null;
+  const boss = /Dropped by:\s*([^<]+)</i.exec(tooltip);
+  out.droppedBy = boss ? decodeEntities(boss[1]).trim() : null;
+  return out;
 }
 
 /**
@@ -103,4 +120,4 @@ function isTwoHandSlot(slot) {
   return TWO_HAND_SLOTS.has(slot);
 }
 
-module.exports = { parseStats, gemStats, isEmbellished, droppedBy, parseSourceXml, classifySource, isTwoHandSlot, emptyStats };
+module.exports = { gemStats, parseItemXml, classifySource, isTwoHandSlot, emptyStats };

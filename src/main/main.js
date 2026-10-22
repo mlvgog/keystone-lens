@@ -39,7 +39,8 @@ const cache = require('./cache');
 const stats = require('./stats');
 const settings = require('./settings');
 const history = require('./history');
-const raidbots = require('./sources/raidbots');
+const talentTrees = require('./sources/talentTrees');
+const itemData = require('./sources/itemData');
 const raiderio = require('./sources/raiderio');
 const wowhead = require('./sources/wowhead');
 const wcl = require('./sources/wcl');
@@ -47,6 +48,7 @@ const { buildClassList } = require('./specs');
 const { analyze, loadDungeon } = require('./collector');
 const { buildView, playerDetail } = require('./views');
 const throughput = require('./throughput');
+const { classifySource } = require('./itemInfo');
 
 const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
 const EXTERNAL_HOSTS = new Set([
@@ -67,10 +69,11 @@ const KIND_SOURCE = {
   character: 'raider.io',
   season: 'raider.io',
   realms: 'raider.io',
-  itemTooltip: 'Wowhead',
-  spellTooltip: 'Wowhead',
   itemSource: 'Wowhead',
-  talents: 'raidbots',
+  talents: 'wago.tools',
+  itemData: 'wago.tools',
+  itemBonus: 'wago.tools',
+  gameTables: 'wago.tools',
   wclZone: 'Warcraft Logs',
   wclRankings: 'Warcraft Logs',
   wclCharacter: 'Warcraft Logs',
@@ -78,21 +81,22 @@ const KIND_SOURCE = {
 };
 const EMPTY_TOTALS = { requests: 0, bytes: 0, errors: 0, retries: 0, ms: 0, avgMs: 0 };
 const ICON_SOURCE = 'Icons (CDN)';
-const ICON_URLS = ['https://wow.zamimg.com/*', 'https://cdn.raiderio.net/*'];
+// Requests made by the page itself: icons, and Wowhead's tooltips script with its data.
+const PAGE_URLS = ['https://cdn.raiderio.net/*', 'https://render.worldofwarcraft.com/*', 'https://wow.zamimg.com/*', 'https://nether.wowhead.com/*'];
 
-/** Count icon downloads made by the page (they bypass our http module). */
+/** Count downloads made by the page (they bypass our http module). */
 function trackIconDownloads() {
   const started = new Map();
   const { webRequest } = electronSession.defaultSession;
-  webRequest.onSendHeaders({ urls: ICON_URLS }, (d) => started.set(d.id, d.timestamp));
-  webRequest.onCompleted({ urls: ICON_URLS }, (d) => {
+  webRequest.onSendHeaders({ urls: PAGE_URLS }, (d) => started.set(d.id, d.timestamp));
+  webRequest.onCompleted({ urls: PAGE_URLS }, (d) => {
     const t0 = started.get(d.id);
     started.delete(d.id);
     if (d.fromCache) return;
     const header = Object.entries(d.responseHeaders || {}).find(([k]) => k.toLowerCase() === 'content-length');
     stats.recordRequest({ url: d.url, status: d.statusCode, bytes: Number(header?.[1]?.[0]) || 0, ms: t0 ? d.timestamp - t0 : 0, log: false });
   });
-  webRequest.onErrorOccurred({ urls: ICON_URLS }, (d) => started.delete(d.id));
+  webRequest.onErrorOccurred({ urls: PAGE_URLS }, (d) => started.delete(d.id));
 }
 
 let win = null;
@@ -153,11 +157,7 @@ function finishTask(controller) {
 
 function viewDeps() {
   const key = session ? history.keyFor(session.meta) : null;
-  return {
-    getTooltip: (variant) => wowhead.getItemTooltip(variant),
-    getEnglishTooltip: wowhead.getLocale() !== 0 ? (variant) => wowhead.getItemTooltip(variant, { locale: 0 }) : null,
-    getSnapshot: (id) => (key ? history.get(key, id) : null),
-  };
+  return { getSnapshot: (id) => (key ? history.get(key, id) : null) };
 }
 
 function failure(err) {
@@ -165,7 +165,7 @@ function failure(err) {
   return { ok: false, error: err?.message || String(err) };
 }
 
-ipcMain.handle('specs:list', async () => buildClassList(await raidbots.getTalentData()));
+ipcMain.handle('specs:list', async () => buildClassList(await talentTrees.getTalentData()));
 
 ipcMain.handle('analyze:start', async (event, opts, { force = false, allowStale = false } = {}) => {
   const controller = startTask();
@@ -237,19 +237,21 @@ ipcMain.handle('dungeon:load', async (event, zoneId, filters) => {
 
 ipcMain.handle('player:detail', (_e, { index, dungeon }) => (session ? playerDetail(session, index, dungeon) : null));
 
-ipcMain.handle('tooltip:item', async (_e, variant, { english = false } = {}) => {
+/**
+ * Details of item variants outside the current session (your character's gear):
+ * [{ id, bonuses, ilvl }] -> [{ stats, primary, stamina, sockets, embellished, slotType, source }].
+ */
+ipcMain.handle('items:describe', async (_e, variants = []) => {
   try {
-    return await wowhead.getItemTooltip(variant, english ? { locale: 0 } : {});
+    const list = variants.slice(0, 40).map((v, i) => ({ key: String(i), id: Number(v.id), bonuses: (v.bonuses || []).map(Number), ilvl: Number(v.ilvl) }));
+    const [described, xml] = await Promise.all([itemData.describeVariants(list, {}), Promise.all(list.map((v) => wowhead.getItemXml(v.id)))]);
+    return list.map((v, i) => ({
+      ...(described[v.key] || {}),
+      slotType: xml[i].slotType,
+      source: session ? classifySource({ src: xml[i], boss: xml[i].droppedBy, seasonDungeons: session.meta.dungeons, raids: [] }) : null,
+    }));
   } catch {
-    return null;
-  }
-});
-
-ipcMain.handle('tooltip:spell', async (_e, spellId) => {
-  try {
-    return await wowhead.getSpellTooltip(Number(spellId));
-  } catch {
-    return null;
+    return [];
   }
 });
 
@@ -283,7 +285,7 @@ ipcMain.handle('dev:stats', async () => {
   const iconDisk = await cache.dirSize(path.join(app.getPath('userData'), 'Cache'));
   disk[ICON_SOURCE] = iconDisk;
   kinds.browserCache = iconDisk;
-  const names = new Set(['raider.io', 'Wowhead', 'raidbots', ICON_SOURCE, ...Object.keys(snap.session), ...Object.keys(snap.lifetime), ...Object.keys(disk)]);
+  const names = new Set(['raider.io', 'Wowhead', 'wago.tools', 'SimulationCraft', ICON_SOURCE, ...Object.keys(snap.session), ...Object.keys(snap.lifetime), ...Object.keys(disk)]);
   return {
     sources: [...names].map((source) => ({
       source,
@@ -340,8 +342,7 @@ ipcMain.handle('export:image', async (_e, { rect, mode, name }) => {
 ipcMain.handle('settings:get', () => ({ settings: settings.getPublic(), locales: wowhead.LOCALES, version: app.getVersion() }));
 
 ipcMain.handle('settings:set', (_e, patch) => {
-  const next = settings.set(patch, LOCALE_IDS);
-  wowhead.setLocale(next.tooltipLocale);
+  settings.set(patch, LOCALE_IDS);
   if ('wclClientId' in patch || 'wclClientSecret' in patch) wcl.forgetToken();
   return settings.getPublic();
 });
@@ -521,7 +522,7 @@ app.whenReady().then(() => {
   history.init(userData);
   stats.init(userData);
   trackIconDownloads();
-  wowhead.setLocale(settings.init(userData, LOCALE_IDS, { vault: secretVault() }).tooltipLocale);
+  settings.init(userData, LOCALE_IDS, { vault: secretVault() });
   createWindow();
 });
 
