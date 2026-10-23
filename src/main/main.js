@@ -52,6 +52,7 @@ const { classifySource } = require('./itemInfo');
 const { importSimcCharacter } = require('./simcImport');
 const { loadRaid } = require('./raidLoader');
 const { bossDifferences } = require('./raid');
+const { characterStatProfile } = require('./gearSummary');
 
 const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
 const EXTERNAL_HOSTS = new Set([
@@ -293,7 +294,12 @@ ipcMain.handle('items:describe', async (_e, variants = []) => {
 
 ipcMain.handle('character:load', async (_e, { region, realm, name, force = false }) => {
   try {
-    return { ok: true, character: await raiderio.getCharacter({ region, realm, name }, { force }) };
+    const character = await raiderio.getCharacter({ region, realm, name }, { force });
+    // Item stats from the game tables, for the "You:" tooltips and the stat comparison.
+    const variants = Object.entries(character.items || {}).map(([slot, it]) => ({ key: slot, id: it.id, bonuses: it.bonuses, ilvl: it.ilvl }));
+    const described = await itemData.describeVariants(variants).catch(() => ({}));
+    const items = Object.fromEntries(Object.entries(character.items || {}).map(([slot, it]) => [slot, { ...it, details: described[slot] || null }]));
+    return { ok: true, character: { ...character, items, statProfile: characterStatProfile(items) } };
   } catch (err) {
     return failure(err);
   }

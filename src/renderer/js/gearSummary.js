@@ -6,24 +6,50 @@ function card(title, ...body) {
   return el('div.ov-card.inset', el('div.ov-title.wow-header', title), ...body);
 }
 
-function statCard(profile) {
+const statOrder = (order) => order.map((s, i) => [i ? el('span.faint', ' > ') : null, el('b', s)]);
+
+/** Top players' stat distribution, and yours under it when comparing (`mine`: your character's profile). */
+function statCard(profile, mine) {
   if (!profile) return card('Secondary stats', el('div.faint', 'Not enough item data.'));
-  const max = Math.max(...profile.stats.map((s) => s.share));
+  const yours = Object.fromEntries((mine?.stats || []).map((s) => [s.key, s]));
+  // Comparing: bars show ratings (yours against the top players' average); otherwise shares.
+  const size = (s) => (mine ? s.avg : s.share);
+  const max = Math.max(...profile.stats.map(size), ...(mine?.stats || []).map(size));
   const sorted = [...profile.stats].sort((a, b) => b.share - a.share);
   return card(
     'Secondary stats',
-    el('div.stat-order', profile.order.map((s, i) => [i ? el('span.faint', ' > ') : null, el('b', s)])),
-    sorted.map((s) =>
-      el(
+    el('div.stat-order', statOrder(profile.order)),
+    mine ? el('div.stat-order.you', el('span.you-label', 'You: '), statOrder(mine.order)) : null,
+    sorted.map((s) => {
+      const y = yours[s.key];
+      const top = el(
         'div.stat-row',
         { title: `Average ${Math.round(s.avg)} rating · ${pct(s.minShare)}–${pct(s.maxShare)} across players` },
         el('span.stat-label', s.label),
-        el('div.stat-bar', el(`i.s-${s.key}`, { style: { width: `${(s.share / max) * 100}%` } })),
+        el('div.stat-bar', el(`i.s-${s.key}`, { style: { width: `${(size(s) / max) * 100}%` } })),
         el('span.stat-val', pct(s.share, 1)),
         el('span.faint.stat-avg', `${Math.round(s.avg)}`)
-      )
-    ),
-    el('div.faint.ov-note', `Share of secondary stats on gear + gems (enchants excluded) · ${profile.players} players`)
+      );
+      if (!y) return top;
+      const delta = Math.round(y.avg) - Math.round(s.avg);
+      return [
+        top,
+        el(
+          'div.stat-row.you',
+          { title: `You: ${Math.round(y.avg)} ${s.label} (${pct(y.share, 1)} of your secondary stats) · top players: ${Math.round(s.avg)} on average` },
+          el('span.stat-label.faint', 'you'),
+          el('div.stat-bar.you', el('i', { style: { width: `${(size(y) / max) * 100}%` } })),
+          el('span.stat-val.you-val', `${Math.round(y.avg)}`),
+          el(`span.stat-avg.${delta === 0 ? 'faint' : delta > 0 ? 'up' : 'down'}`, `${delta > 0 ? '▲' : delta < 0 ? '▼' : ''}${Math.abs(delta)}`)
+        ),
+      ];
+    }),
+    el(
+      'div.faint.ov-note',
+      mine
+        ? `Rating on gear + gems (enchants excluded): top ${profile.players} players' average, and yours in cyan with the difference (▲ more, ▼ less). Percentages: share of all secondary stats.`
+        : `Share of secondary stats on gear + gems (enchants excluded) · ${profile.players} players`
+    )
   );
 }
 
@@ -116,7 +142,7 @@ export function renderGearOverview(ctx) {
   const body = el(
     'div.ov-grid',
     view.trends ? trendsCard(ctx) : null,
-    statCard(view.statProfile),
+    statCard(view.statProfile, ctx.character?.statProfile),
     enchantCard(s, N),
     gemCard(s, N),
     tierCard(s, N)

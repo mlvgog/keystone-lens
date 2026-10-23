@@ -77,6 +77,16 @@ function statProfile(players, itemInfo) {
   return { players: per.length, stats, order: [...stats].sort((a, b) => b.share - a.share).map((s) => s.label) };
 }
 
+/**
+ * Your character's secondary stat distribution, comparable with statProfile: items carry
+ * `details.stats` (from the game tables). Null when too few items have stats.
+ */
+function characterStatProfile(items) {
+  const itemInfo = {};
+  for (const it of Object.values(items || {})) if (it?.details?.stats) itemInfo[variantKeyOf(it)] = { stats: it.details.stats };
+  return statProfile([{ items }], itemInfo);
+}
+
 function weaponSetup(player, itemSources) {
   const mh = player.items?.mainhand;
   const oh = player.items?.offhand;
@@ -159,4 +169,4 @@ function summarizeGear(players, itemInfo, itemSources = {}) {
   };
 }
 
-module.exports = { statProfile, summarizeGear, playerSecondaryStats, weaponSetup, STATS };
+module.exports = { statProfile, characterStatProfile, summarizeGear, playerSecondaryStats, weaponSetup, STATS };

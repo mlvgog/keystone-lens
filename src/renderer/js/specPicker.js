@@ -80,7 +80,7 @@ export function renderSpecPicker(container, classes, prefs, onStart, { recents =
   const raidNote = el(
     'div.footnote.faint',
     'For every boss of the current raid, the top 100 logged kills of the spec on Warcraft Logs (by damage, or healing for healers), with each player’s talents and gear at that kill. ',
-    'Pick a boss in the results to see what changes on it. Uses about 20–60 of your hourly Warcraft Logs points; nothing is saved to disk.'
+    'Pick a boss in the results to see what changes on it. Each raid load is about 10 Warcraft Logs lookups, and Warcraft Logs limits how many heavy lookups a key can make per hour, so a few raid loads an hour is the practical maximum. Results are kept in memory for 30 minutes; nothing is saved to disk.'
   );
 
   function setMode(value) {

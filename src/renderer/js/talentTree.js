@@ -402,9 +402,11 @@ export function renderTalents(container, ctx) {
 function captionText({ meta, view, filters, inspect }) {
   const region = meta.region === 'world' ? 'World' : meta.region.toUpperCase();
   const parts = [`${meta.specName} ${meta.className}`];
-  if (inspect) parts.push(`${inspect.name} — ${inspect.realm} (${String(inspect.region).toUpperCase()})`, `+${inspect.run.level} ${inspect.run.dungeon}`);
-  else parts.push(`Top ${view.sampleSize} M+ players`);
-  parts.push(region, `Patch ${meta.patch || '?'}`);
+  const raid = meta.mode === 'raid';
+  if (inspect) parts.push(`${inspect.name} — ${inspect.realm} (${String(inspect.region).toUpperCase()})`, raid ? inspect.run.dungeon : `+${inspect.run.level} ${inspect.run.dungeon}`);
+  else parts.push(raid ? `Top ${view.sampleSize} ${meta.difficultyName} raid ${view.dungeon ? 'kills' : 'players'}` : `Top ${view.sampleSize} M+ players`);
+  if (raid) parts.push(meta.zone.name);
+  else parts.push(region, `Patch ${meta.patch || '?'}`);
   if (!inspect && view.dungeon) parts.push(view.dungeon.name);
   if (!inspect && filters.hero != null) parts.push(view.hero.find((h) => h.id === filters.hero)?.name || '');
   if (!inspect && filters.build) parts.push(`Build ${view.builds.list.find((b) => b.id === filters.build)?.index ?? ''}`);

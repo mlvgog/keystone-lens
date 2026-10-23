@@ -2303,3 +2303,39 @@ textarea.wow-textarea:focus {
   height: 18px;
   border-radius: 3px;
 }
+
+/* Your character under the top players' stat distribution */
+.stat-row.you {
+  padding: 0 0 4px;
+  margin-top: -2px;
+}
+.stat-row.you .stat-label {
+  font-size: 11px;
+  text-align: right;
+  padding-right: 6px;
+}
+.stat-bar.you {
+  height: 5px;
+}
+.stat-bar.you i {
+  background: linear-gradient(90deg, #2e8bb8, #6fd0ff);
+}
+.stat-val.you-val {
+  color: #8fd3ff;
+  font-size: 12px;
+}
+.stat-avg.up {
+  color: #6fdc6f;
+  font-size: 11px;
+}
+.stat-avg.down {
+  color: #ff7b6b;
+  font-size: 11px;
+}
+.stat-order.you {
+  font-size: 12px;
+  margin-top: -2px;
+}
+.stat-order.you .you-label {
+  color: #8fd3ff;
+}

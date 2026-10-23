@@ -7,6 +7,8 @@ const talentTrees = require('./sources/talentTrees');
 const itemData = require('./sources/itemData');
 const wowhead = require('./sources/wowhead');
 const raiderio = require('./sources/raiderio');
+const { characterStatProfile } = require('./gearSummary');
+const { gemLabel } = require('./raid');
 
 const EQUIPPED = ['head', 'neck', 'shoulder', 'back', 'chest', 'wrist', 'hands', 'waist', 'legs', 'feet', 'finger1', 'finger2', 'trinket1', 'trinket2', 'mainhand', 'offhand'];
 
@@ -65,11 +67,15 @@ async function importSimcCharacter(text, { loadout = 0, signal } = {}) {
   const decoded = decodeLoadout(talentText, tree);
 
   const variants = simc.items.map((it) => ({ key: it.slot, id: it.id, bonuses: it.bonuses, ilvl: it.ilvl, craftedStats: it.craftedStats, statsFrom: it.statsFrom }));
-  const [described, xml, realm] = await Promise.all([
+  const gemIds = [...new Set(simc.items.flatMap((it) => it.gemIds))];
+  const [described, xml, realm, gemXml] = await Promise.all([
     itemData.describeVariants(variants.filter((v) => v.ilvl), { signal }),
     Promise.all(simc.items.map((it) => wowhead.getItemXml(it.id, { signal }))),
     realmName(simc.region, simc.realmSlug, { signal }),
+    Promise.all(gemIds.map((id) => wowhead.getItemXml(id, { signal }))),
   ]);
+  // Gem labels like "16 Mast & 7 Crit" (what the stat comparison reads, as for raider.io gems).
+  const gemName = new Map(gemIds.map((id, i) => [id, gemLabel(gemXml[i]?.stats) || gemXml[i]?.name || null]));
   const items = {};
   simc.items.forEach((it, i) => {
     const info = xml[i] || {};
@@ -83,7 +89,7 @@ async function importSimcCharacter(text, { loadout = 0, signal } = {}) {
       bonuses: it.bonuses,
       tier: info.itemSet ? String(info.itemSet) : null,
       enchants: it.enchantId ? [{ id: it.enchantId, name: null, icon: null }] : [],
-      gems: it.gemIds.map((id) => ({ id, name: null, icon: null })),
+      gems: it.gemIds.map((id) => ({ id, name: gemName.get(id) || null, icon: null })),
       twoHand: isTwoHandSlot(info.slot),
       details: details ? { ...details, slotType: info.slotType || null } : null,
     };
@@ -102,6 +108,7 @@ async function importSimcCharacter(text, { loadout = 0, signal } = {}) {
     thumbnail: null,
     talents: { specId: decoded.specId, heroSubTreeId: decoded.heroSubTreeId, loadoutText: talentText, version: null, nodes: decoded.nodes },
     items,
+    statProfile: characterStatProfile(items),
     loadouts: loadouts.map((l) => l.name),
     loadout: chosen,
   };

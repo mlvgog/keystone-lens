@@ -6,13 +6,13 @@ Releases are built by GitHub Actions ([`release.yml`](../.github/workflows/relea
 2. checks that the tag matches `version` in `package.json`;
 3. builds the installer and the portable exe on Windows;
 4. writes `SHA256SUMS.txt`;
-5. attaches everything to a **draft** release.
-
-Nothing is published until you publish the draft.
+5. publishes a release with the files, using `docs/release-notes/<tag>.md` as its notes (plus GitHub's list of changes).
 
 ## Steps
 
-1. **Bump the version.** This updates `package.json` and `package-lock.json` and creates a commit and a `v1.1.0` tag:
+1. **Write the release notes** in `docs/release-notes/v1.1.0.md` (what's new, for players) and commit them.
+
+2. **Bump the version.** This updates `package.json` and `package-lock.json` and creates a commit and a `v1.1.0` tag:
 
    ```bat
    npm version minor
@@ -20,15 +20,15 @@ Nothing is published until you publish the draft.
 
    Use `patch` for fixes and `minor` for new features.
 
-2. **Push the commit and the tag:**
+3. **Push the commit and the tag:**
 
    ```bat
    git push --follow-tags
    ```
 
-3. **Wait for the Release workflow** under the repository's **Actions** tab (about 5 minutes).
+4. **Wait for the Release workflow** under the repository's **Actions** tab (about 5 minutes). The release appears under **Releases** when it finishes.
 
-4. **Publish the draft.** Open **Releases**, edit the new draft and check the generated notes. Download the installer once to try it, then press **Publish release**.
+To review a release before it goes out, set `draft: true` in `release.yml` and publish the draft from **Releases** yourself.
 
 ## Building locally
 

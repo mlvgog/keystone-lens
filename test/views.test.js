@@ -160,3 +160,16 @@ test('stat profile and gear summary', () => {
   assert.equal(summary.embellishments.withTwo, 2);
   assert.equal(summary.embellishments.items[0].count, 2);
 });
+
+test("your character's stat profile is comparable with the top players'", () => {
+  const { characterStatProfile } = require('../src/main/gearSummary');
+  const items = {
+    head: { id: 1, bonuses: [], ilvl: 300, gems: [{ name: '16 Mast & 7 Crit' }], details: { stats: { crit: 100, haste: 0, mastery: 50, vers: 0 } } },
+    chest: { id: 2, bonuses: [], ilvl: 300, gems: [], details: { stats: { crit: 0, haste: 77, mastery: 0, vers: 50 } } },
+  };
+  const p = characterStatProfile(items);
+  const share = Object.fromEntries(p.stats.map((s) => [s.key, Math.round(s.share * 1000) / 1000]));
+  assert.deepEqual(share, { crit: 0.357, haste: 0.257, mastery: 0.22, vers: 0.167 });
+  assert.equal(p.order[0], 'Critical Strike');
+  assert.equal(characterStatProfile({ head: { id: 1, bonuses: [], ilvl: 300, gems: [] } }), null);
+});
