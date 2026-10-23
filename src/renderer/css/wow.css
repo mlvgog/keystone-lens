@@ -2265,3 +2265,41 @@ textarea.wow-textarea:focus {
   height: 24px;
   font-size: 12px;
 }
+
+/* ------------------------------------------------------------------ raid mode */
+.mode-switch {
+  align-self: center;
+  margin-bottom: 4px;
+}
+.raid-hint {
+  max-width: 760px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-dim);
+  border: 1px solid #2e6d92;
+  border-radius: 4px;
+  background: rgba(40, 120, 150, 0.15);
+}
+.boss-diff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin: 0 0 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.boss-diff .wow-header {
+  font-size: 13px;
+}
+.boss-diff-item {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.boss-diff-item .mini-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+}

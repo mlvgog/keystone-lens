@@ -60,11 +60,11 @@ function htmlLines(html) {
 
 /**
  * Wowhead's documented item XML (www.wowhead.com/item=ID&xml, English):
- * { source: [codes], more: [...], slot, slotType, droppedBy, name, quality, icon, itemSet }.
+ * { source: [codes], more: [...], slot, slotType, droppedBy, name, quality, icon, itemSet, stats }.
  */
 function parseItemXml(xml) {
   const text = String(xml || '');
-  const out = { source: [], more: [], slot: null, slotType: null, droppedBy: null, name: null, quality: null, icon: null, itemSet: null };
+  const out = { source: [], more: [], slot: null, slotType: null, droppedBy: null, name: null, quality: null, icon: null, itemSet: null, stats: [] };
   out.name = /<name><!\[CDATA\[([\s\S]*?)\]\]><\/name>/.exec(text)?.[1] ?? null;
   const quality = /<quality id="(\d+)"/.exec(text);
   out.quality = quality ? Number(quality[1]) : null;
@@ -86,6 +86,14 @@ function parseItemXml(xml) {
   // "Head | Leather", or just "Back" for cloaks, necks and rings.
   const slotRow = /<table width="100%"><tr><td>([\s\S]*?)<\/td>(?:<th>([\s\S]*?)<\/th>)?/.exec(tooltip);
   if (slotRow) out.slotType = htmlLines(`${slotRow[1]} ${slotRow[2] || ''}`).join(' ') || null;
+  // "+16 Mastery & +7 Critical Strike" lines (for gems: what they add when socketed).
+  for (const line of htmlLines(tooltip)) {
+    if (!line.startsWith('+')) continue;
+    for (const part of line.split('&')) {
+      const m = /^\s*\+?\s*([\d,]+)\s+(.+?)\s*$/.exec(part);
+      if (m) out.stats.push({ value: Number(m[1].replace(/,/g, '')), stat: m[2] });
+    }
+  }
   const boss = /Dropped by:\s*([^<]+)</i.exec(tooltip);
   out.droppedBy = boss ? decodeEntities(boss[1]).trim() : null;
   return out;

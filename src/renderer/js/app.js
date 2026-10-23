@@ -54,12 +54,15 @@ function savePrefs(patch) {
     // ignore
   }
 }
-const searchKey = (o) => [o.classSlug, o.specSlug, o.region, o.sampleSize, o.since || ''].join('|');
+const searchKey = (o) => [o.mode || 'mplus', o.classSlug, o.specSlug, o.region, o.sampleSize, o.since || '', o.difficulty || ''].join('|');
 function rememberSearch(opts) {
   const prefs = loadPrefs();
   const recents = [opts, ...(prefs.recents || []).filter((r) => searchKey(r) !== searchKey(opts))].slice(0, 8);
-  const { classSlug, specId, region, sampleSize, since } = opts;
-  savePrefs({ last: opts, recents, picker: { classSlug, specId, region, sampleSize, since } });
+  const { classSlug, specId, region, sampleSize, since, mode, difficulty } = opts;
+  const picker = { ...(prefs.picker || {}), classSlug, specId, mode: mode || 'mplus' };
+  if (mode === 'raid') picker.difficulty = difficulty;
+  else Object.assign(picker, { region, sampleSize, since });
+  savePrefs({ last: opts, recents, picker });
 }
 
 // ---------------------------------------------------------------- window chrome
@@ -134,11 +137,15 @@ async function showPicker() {
   renderSpecPicker(viewEl, state.classes, prefs.picker || {}, (opts) => openSearch(opts), {
     recents: prefs.recents || [],
     defaults: { region: state.settings?.defaultRegion, sampleSize: state.settings?.defaultSize },
+    hasWcl: !!(state.settings?.wclClientId && state.settings?.wclHasSecret),
+    onSettings: openSettings,
   });
 }
 
 /** Recent searches open instantly from the cache (even if older than an hour). */
 async function openSearch(opts) {
+  // Raid data (Warcraft Logs) lives in memory only, so raid searches always load.
+  if (opts.mode === 'raid') return startAnalysis(opts);
   const cached = await window.api.analyzeCached(opts);
   if (cached.ok) {
     applyResult(opts, cached.result);
@@ -162,13 +169,13 @@ async function startAnalysis(opts, { force = false } = {}) {
   const off = window.api.onProgress((p) => p.kind !== 'dungeon' && prog.update(p));
   let res;
   try {
-    res = await window.api.analyze(opts, { force });
+    res = await (opts.mode === 'raid' ? window.api.raidStart(opts, { force }) : window.api.analyze(opts, { force }));
   } finally {
     off();
   }
   if (cancelled || res.cancelled) return;
   if (!res.ok) {
-    prog.showError(res.error || 'Unknown error', showPicker);
+    prog.showError(res.code === 'WCL_LIMIT' ? limitMessage(null) : res.error || 'Unknown error', showPicker);
     return;
   }
   applyResult(opts, res.result);
@@ -187,7 +194,7 @@ function applyResult(opts, result) {
   state.inspect = null;
   state.history = [];
   state.tp = null;
-  window.api.historyList().then((list) => {
+  if (result.meta.mode !== 'raid') window.api.historyList().then((list) => {
     state.history = list;
     if (dom) renderHeader();
   });
@@ -265,6 +272,21 @@ async function restoreCharacter() {
 }
 
 // ---------------------------------------------------------------- results
+/** Header facts in raid mode: raid, difficulty, players, bosses and the data source. */
+function raidFacts(meta, view) {
+  const unit = meta.metric === 'hps' ? 'HPS' : 'DPS';
+  return el(
+    'div.facts',
+    el('span', el('b', meta.zone.name), ` · ${meta.difficultyName}`),
+    view.dungeon
+      ? el('span', el('b', String(view.baseSize)), ` top ${meta.specName} kills on ${view.dungeon.name} (by ${unit})`)
+      : el('span', el('b', String(view.baseSize)), ` players in the top ${meta.requested} kills of ${meta.dungeons.length} bosses`),
+    view.sampleSize !== view.baseSize ? el('span', 'showing ', el('b', String(view.sampleSize))) : null,
+    meta.missing?.length ? el('span.warn', { title: meta.missing.join(', ') }, `⚠ ${meta.missing.length} bosses not loaded (Warcraft Logs limit)`) : null,
+    el('button.link-btn', { onclick: () => window.api.openExternal('https://www.warcraftlogs.com'), title: 'Kills, talents and gear come from Warcraft Logs' }, 'Data: Warcraft Logs')
+  );
+}
+
 function showResults() {
   resetView();
   setHeader({ ...state.opts, specIcon: state.meta.specIcon || state.opts.specIcon });
@@ -274,6 +296,9 @@ function showResults() {
   viewEl.append(el('div.results', header, banner, body));
   dom = { header, banner, body };
   tabs.hidden = false;
+  // Raid mode has no Damage tab (that tab is Mythic+ only).
+  tabs.querySelector('[data-tab=damage]').hidden = state.meta?.mode === 'raid';
+  if (state.meta?.mode === 'raid' && state.tab === 'damage') state.tab = 'talents';
   renderAll();
 }
 
@@ -288,7 +313,7 @@ function renderHeader() {
   const { meta, view } = state;
   const regionName = meta.region === 'world' ? 'World' : meta.region.toUpperCase();
   const current = view.sampleSize - view.fallbackCount;
-  const facts = el(
+  const facts = meta.mode === 'raid' ? raidFacts(meta, view) : el(
     'div.facts',
     el(
       'span',
@@ -345,8 +370,12 @@ function inspectBanner(p) {
     el('span.wow-header', 'Inspecting'),
     el('span', { style: { color: state.meta.color } }, `#${p.rank} ${p.name}`),
     el('span.dim', `${p.realm} (${String(p.region).toUpperCase()})`),
-    el('span', `+${p.run.level} ${p.run.dungeon}`),
-    el('span.dim', `patch ${p.run.version || '?'}${p.fallback ? ' (older patch)' : ''} · ilvl ${p.itemLevel ? p.itemLevel.toFixed(1) : '?'}`),
+    state.meta.mode === 'raid'
+      ? el('span', `${p.run.dungeon} · ${Math.round(p.run.score || 0).toLocaleString()} ${state.meta.metric === 'hps' ? 'HPS' : 'DPS'}`)
+      : el('span', `+${p.run.level} ${p.run.dungeon}`),
+    state.meta.mode === 'raid'
+      ? el('span.dim', `${state.meta.difficultyName} · ilvl ${p.itemLevel ? p.itemLevel.toFixed(1) : '?'}`)
+      : el('span.dim', `patch ${p.run.version || '?'}${p.fallback ? ' (older patch)' : ''} · ilvl ${p.itemLevel ? p.itemLevel.toFixed(1) : '?'}`),
     el('div.spacer'),
     el(
       'button.link-btn',
@@ -511,7 +540,7 @@ async function loadThroughput(patch = {}, { force = false } = {}) {
 
 function limitMessage(resetIn) {
   const minutes = resetIn ? Math.max(1, Math.ceil(resetIn / 60)) : null;
-  return `Warcraft Logs' hourly limit for your API key is used up${minutes ? ` — it resets in about ${minutes} minute${minutes === 1 ? '' : 's'}` : ''}. Everything already loaded stays cached for a day, so switching back costs nothing.`;
+  return `Warcraft Logs' hourly limit for your API key is used up${minutes ? ` — it resets in about ${minutes} minute${minutes === 1 ? '' : 's'}` : ''}. Everything already loaded stays available for 30 minutes while the app is open, so switching back costs nothing.`;
 }
 
 function cancelThroughput() {
@@ -653,7 +682,7 @@ function applyTooltipLanguage() {
   }
   applyTooltipLanguage();
   const last = loadPrefs().last;
-  if (last) {
+  if (last && last.mode !== 'raid') {
     const res = await window.api.analyzeCached(last);
     if (res.ok) {
       applyResult(last, res.result);

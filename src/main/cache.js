@@ -13,7 +13,7 @@ const DAY = 24 * HOUR;
  * Kinds that are kept in memory only, never on disk: Warcraft Logs answers with
  * "Cache-Control: no-cache, private" and its API terms forbid keeping longer copies.
  */
-const MEMORY_ONLY = new Set(['wclZone', 'wclRankings', 'wclCharacter']);
+const MEMORY_ONLY = new Set(['wclZone', 'wclRankings', 'wclCharacter', 'wclRaid']);
 
 /** Kinds older versions stored that are no longer used (Wowhead tooltip data); deleted on start. */
 const RETIRED = ['itemTooltip', 'spellTooltip'];
@@ -32,10 +32,12 @@ const TTL = {
   wclZone: 30 * MINUTE,
   wclRankings: 30 * MINUTE,
   wclCharacter: 30 * MINUTE,
+  wclRaid: 30 * MINUTE,
   run: Infinity,
   itemSource: 7 * DAY,
   itemData: 7 * DAY,
   itemBonus: 7 * DAY,
+  enchantName: 7 * DAY,
   gameTables: DAY,
   analysis: HOUR,
 };

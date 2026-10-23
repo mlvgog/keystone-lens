@@ -198,9 +198,80 @@ async function getCharacterRuns({ name, realmSlug, region, encounters, specName,
   );
 }
 
+/**
+ * The current raid tier: the newest expansion's open zone with Mythic difficulty and the most
+ * bosses (not the single-encounter "Complete Raid" zones): { id, name, encounters, difficulties }.
+ */
+async function getRaidZone({ signal } = {}) {
+  return cache.cached('wclZone', 'raid', async () => {
+    const d = await query('{ worldData { expansions { id zones { id name frozen difficulties { id name } encounters { id name } } } } }', {}, { signal });
+    const expansions = [...d.worldData.expansions].sort((a, b) => b.id - a.id);
+    for (const e of expansions) {
+      const raids = e.zones
+        .filter((z) => !z.frozen && (z.difficulties || []).some((x) => x.id === 5) && !/Mythic\+/i.test(z.name))
+        .sort((a, b) => b.encounters.length - a.encounters.length || b.id - a.id);
+      if (raids[0]?.encounters.length > 1) {
+        const z = raids[0];
+        return { id: z.id, name: z.name, encounters: z.encounters, difficulties: z.difficulties };
+      }
+    }
+    throw new Error('Warcraft Logs has no current raid.');
+  });
+}
+
+/**
+ * The top logged kills of a spec on one raid boss (up to 100), with each player's talents
+ * ([{ talentID, points }], talentID = the game's talent entry id) and gear at that kill.
+ * difficulty: 3 Normal, 4 Heroic, 5 Mythic.
+ */
+async function getBossRankings({ encounterId, difficulty, className, specName, metric }, { signal, force = false } = {}) {
+  if (!METRICS.has(metric)) throw new Error(`Unknown metric ${metric}`);
+  const c = wclName(className);
+  const s = wclName(specName);
+  return cache.cached(
+    'wclRaid',
+    `${encounterId}|${difficulty}|${c}|${s}|${metric}`,
+    async () => {
+      const d = await query(
+        `query($id: Int!, $c: String!, $s: String!, $d: Int!) { worldData { encounter(id: $id) { characterRankings(className: $c, specName: $s, metric: ${metric}, difficulty: $d, includeCombatantInfo: true) } } }`,
+        { id: encounterId, c, s, d: difficulty },
+        { signal }
+      );
+      return (d.worldData.encounter?.characterRankings?.rankings || [])
+        .filter((r) => r.amount > 0)
+        .map((r) => ({
+          name: r.name,
+          server: r.server?.name || null,
+          region: r.server?.region || null,
+          amount: r.amount,
+          duration: r.duration,
+          startTime: r.startTime ?? null,
+          report: r.report?.code || null,
+          fight: r.report?.fightID ?? null,
+          talents: (r.talents || []).map((t) => ({ id: Number(t.talentID), points: Number(t.points) || 1 })),
+          gear: (r.gear || []).map((g) =>
+            g && Number(g.id)
+              ? {
+                  id: Number(g.id),
+                  name: g.name || null,
+                  icon: g.icon || null,
+                  quality: g.quality || null,
+                  itemLevel: Number(g.itemLevel) || null,
+                  bonusIDs: (g.bonusIDs || []).map(Number).filter(Boolean),
+                  gems: (g.gems || []).map((x) => Number(x.id)).filter(Boolean),
+                  enchant: Number(g.permanentEnchant) || null,
+                }
+              : null
+          ),
+        }));
+    },
+    { force }
+  );
+}
+
 /** API allowance: { limitPerHour, pointsSpentThisHour, pointsResetIn }. */
 async function rateLimit({ signal } = {}) {
   return (await query('{ rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn } }', {}, { signal })).rateLimitData;
 }
 
-module.exports = { query, testConnection, hasCredentials, forgetToken, getMplusZone, getSpecRuns, getCharacterRuns, rateLimit, wclName, MIN_RUN_MS };
+module.exports = { query, testConnection, hasCredentials, forgetToken, getMplusZone, getRaidZone, getSpecRuns, getBossRankings, getCharacterRuns, rateLimit, wclName, MIN_RUN_MS };

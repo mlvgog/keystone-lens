@@ -307,7 +307,8 @@ export function renderTalents(container, ctx) {
   const picks = inspect ? pickMap(inspect.talents) : null;
   const yours = character && !inspect ? pickMap(character.talents) : null;
   const trends = !inspect ? view.trends : null;
-  const diff = new Set(!inspect ? view.diffNodes : []);
+  // Rings: where a selected build differs from the majority, or what changes on a raid boss.
+  const diff = new Set(!inspect ? [...view.diffNodes, ...(view.bossDiff || []).map((d) => d.nodeId)] : []);
   const heroIds = view.hero.map((h) => h.id);
   // Default to the hero tree most of the *shown* players use (e.g. a selected build's hero tree).
   // When comparing, start on your own hero tree.
@@ -367,7 +368,9 @@ export function renderTalents(container, ctx) {
 
   const zoomBox = el('div', frame);
   const wrap = el('div.talent-wrap', zoomBox);
-  container.append(...[toolbar(ctx, mode, () => exportImage), mode === 'overview' ? buildsStrip(ctx) : null, wrap].filter(Boolean));
+  container.append(
+    ...[toolbar(ctx, mode, () => exportImage), mode === 'overview' ? buildsStrip(ctx) : null, mode === 'overview' ? bossDiffCard(ctx) : null, wrap].filter(Boolean)
+  );
 
   function fit() {
     zoomBox.style.zoom = 1;
@@ -427,6 +430,7 @@ function toolbar(ctx, mode, getExport) {
           el('span', el('i', { style: { background: '#2a2a2a', border: '1px solid #555' } }), 'never'),
           ctx.character ? el('span', el('i.you-legend'), 'your picks') : null,
           view.diffNodes.length ? el('span', el('i.diff-legend'), 'differs from majority') : null,
+          view.bossDiff?.length ? el('span', el('i.diff-legend'), `picked differently on ${view.dungeon?.name || 'this boss'}`) : null,
           el('span.faint', 'choice nodes: left | right')
         );
 
@@ -451,6 +455,30 @@ function toolbar(ctx, mode, getExport) {
   const saveBtn = el('button.wow-btn.small', { onclick: () => getExport()('save'), title: 'Save the talent tree as a PNG image' }, 'Save image');
   const copyImgBtn = el('button.wow-btn.small', { onclick: () => getExport()('copy'), title: 'Copy the talent tree image (paste into Discord)' }, 'Copy image');
   return el('div.talent-toolbar', legend, el('div.spacer'), copyBtn, saveBtn, copyImgBtn);
+}
+
+/** Raid mode, one boss: the talents picked noticeably differently than on the other bosses. */
+function bossDiffCard({ view, meta }) {
+  if (meta.mode !== 'raid' || !view.dungeon || !view.bossDiff) return null;
+  const card = el('div.boss-diff.inset', el('span.wow-header', `Picked differently on ${view.dungeon.name}`));
+  if (!view.bossDiff.length) {
+    card.append(el('span.faint', 'Nothing stands out: the top players use the same talents here as on the other bosses.'));
+    return card;
+  }
+  for (const d of view.bossDiff) {
+    const up = d.boss > d.others;
+    card.append(
+      el(
+        'span.boss-diff-item',
+        { title: `${pct(d.boss)} of the top players here, ${pct(d.others)} on the other bosses` },
+        iconImg(d.icon, { cls: 'mini-icon' }),
+        ` ${d.name} `,
+        el(up ? 'b.tt-green' : 'b.tt-red', `${pct(d.boss)}`),
+        el('span.faint', ` vs ${pct(d.others)}`)
+      )
+    );
+  }
+  return card;
 }
 
 function buildsStrip({ view, filters, onFilter }) {

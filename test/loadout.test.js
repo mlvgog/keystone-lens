@@ -94,3 +94,16 @@ test('a real build decodes exactly like raider.io decodes it', () => {
   const sort = (list) => [...list].sort((a, b) => a.nodeId - b.nodeId);
   assert.deepEqual(sort(d.nodes), sort(fx.expected.nodes));
 });
+
+test('import strings made from talent picks decode back to the same picks', () => {
+  const { encodeLoadout } = require('../src/main/loadout');
+  const fx = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'loadout-261.json'), 'utf8'));
+  const picks = decodeLoadout(fx.loadoutText, fx.tree);
+  const again = decodeLoadout(encodeLoadout(picks, fx.tree), fx.tree);
+  const sort = (list) => [...list].sort((a, b) => a.nodeId - b.nodeId);
+  assert.equal(again.heroSubTreeId, picks.heroSubTreeId);
+  assert.deepEqual(sort(again.nodes), sort(picks.nodes));
+  // Synthetic tree: free nodes, partial ranks, choices and apex tiers survive the round trip.
+  const d = decodeLoadout(encode(261, TREE, { 1: {}, 2: { rank: 1 }, 3: { choice: 1 }, 4: { rank: 3 }, 5: { granted: true }, 10: { granted: true }, 11: {}, 21: { choice: 1 } }), TREE);
+  assert.deepEqual(sort(decodeLoadout(encodeLoadout(d, TREE), TREE).nodes), sort(d.nodes));
+});

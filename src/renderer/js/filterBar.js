@@ -10,18 +10,22 @@ export function renderFilterBar(s, h) {
   const { meta, view, filters } = s;
   const bar = el('div.filter-bar');
 
-  // Dungeon
+  // Dungeon (a boss in raid mode)
+  const raid = meta.mode === 'raid';
   const dungeon = el(
     'select.wow-select',
-    { disabled: s.busy, title: 'Use each player’s best key in one dungeon instead of their best key overall' },
-    el('option', { value: '' }, 'All dungeons (best key)'),
+    {
+      disabled: s.busy,
+      title: raid ? 'The top kills on one boss, instead of every player once (their best-ranked kill)' : 'Use each player’s best key in one dungeon instead of their best key overall',
+    },
+    el('option', { value: '' }, raid ? 'All bosses (best kill)' : 'All dungeons (best key)'),
     meta.dungeons.map((d) =>
       el('option', { value: String(d.id) }, `${d.name}${s.dungeonsLoaded.includes(d.id) ? '' : '  — click to load'}`)
     )
   );
   dungeon.value = filters.dungeon ? String(filters.dungeon) : '';
   dungeon.addEventListener('change', () => h.onDungeon(dungeon.value ? Number(dungeon.value) : null));
-  bar.append(el('label.fb-group', el('span.fb-label', 'Dungeon'), dungeon));
+  bar.append(el('label.fb-group', el('span.fb-label', raid ? 'Boss' : 'Dungeon'), dungeon));
 
   // Hero tree
   const heroes = el('div.segmented');
@@ -69,7 +73,8 @@ export function renderFilterBar(s, h) {
   );
   changes.value = filters.trendsSince || '';
   changes.addEventListener('change', () => h.onFilter({ trendsSince: changes.value || null }));
-  bar.append(el('label.fb-group', el('span.fb-label', 'Trends'), changes));
+  // Raid data is not kept between runs, so there is nothing to compare with.
+  if (!raid) bar.append(el('label.fb-group', el('span.fb-label', 'Trends'), changes));
 
   bar.append(el('div.spacer'));
 

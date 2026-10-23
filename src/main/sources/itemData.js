@@ -178,6 +178,28 @@ function isEmbellished(item, bonusRows) {
   return item.limitCategory === EMBELLISHED_LIMIT || bonusRows.some((b) => b.type === BONUS.limitCategory && b.values[0] === EMBELLISHED_LIMIT);
 }
 
+/**
+ * Names of enchants by enchant id, e.g. "Enchant Helm - Empowered Rune of Avoidance" (the game's
+ * SpellItemEnchantment names, without the crafting-quality icon markup).
+ */
+function getEnchantNames(ids, opts) {
+  return cachedById(
+    'enchantName',
+    ids,
+    async (missing, o) => {
+      const out = {};
+      for (const r of await rowsById('SpellItemEnchantment', 'ID', missing, o)) {
+        out[r.ID] = String(r.Name_lang || '')
+          .replace(/\|A:[^|]*\|a/g, '')
+          .replace(/\|c[0-9a-f]{8}|\|r/gi, '')
+          .trim() || null;
+      }
+      return out;
+    },
+    opts
+  );
+}
+
 /** Item quality after its bonus IDs (upgrades can raise it), or null when no bonus sets one. */
 function bonusQuality(bonusRows) {
   const q = bonusRows.find((b) => b.type === BONUS.quality);
@@ -217,4 +239,4 @@ async function describeVariants(variants, { signal } = {}) {
   return out;
 }
 
-module.exports = { describeVariants, itemStats, isEmbellished, parseSimcTable, getScaleTables };
+module.exports = { describeVariants, getEnchantNames, itemStats, isEmbellished, parseSimcTable, getScaleTables };

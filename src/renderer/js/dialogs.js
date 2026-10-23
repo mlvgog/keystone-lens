@@ -407,6 +407,8 @@ const KIND_LABELS = {
   wclZone: 'Warcraft Logs season data (memory only)',
   wclRankings: 'Warcraft Logs runs, spec (memory only)',
   wclCharacter: 'Warcraft Logs runs, you (memory only)',
+  wclRaid: 'Warcraft Logs raid kills (memory only)',
+  enchantName: 'Enchant names',
 };
 
 function sum(list, pick) {

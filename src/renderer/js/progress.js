@@ -1,4 +1,5 @@
 import { el, iconImg, clear } from './util.js';
+import { searchLabel } from './specPicker.js';
 
 export function castbar(cls = '') {
   const fill = el('div.fill');
@@ -30,7 +31,6 @@ export function renderProgress(container, opts, onCancel) {
   const steps = el('div.steps');
   const log = el('div.log.inset');
   const cancelBtn = el('button.wow-btn', { onclick: onCancel }, 'Cancel');
-  const regionName = opts.region === 'world' ? 'World' : opts.region.toUpperCase();
 
   const panel = el(
     'div.progress-panel.inset',
@@ -40,7 +40,7 @@ export function renderProgress(container, opts, onCancel) {
       el(
         'div',
         el('h2.wow-header', 'Inspecting players…'),
-        el('div.dim', el('span', { style: { color: opts.color } }, `${opts.specName} ${opts.className}`), ` · Top ${opts.sampleSize} · ${regionName}`)
+        el('div.dim', el('span', { style: { color: opts.color } }, `${opts.specName} ${opts.className}`), ` · ${searchLabel(opts)}`)
       )
     ),
     overall.bar,

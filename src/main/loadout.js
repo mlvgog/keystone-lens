@@ -108,4 +108,52 @@ function decodeLoadout(text, tree) {
   return { specId, heroSubTreeId, nodes };
 }
 
-module.exports = { decodeLoadout, loadoutSpecId, ALPHABET };
+/**
+ * An in-game import string for talent picks ({ specId, heroSubTreeId, nodes } as decodeLoadout
+ * returns them) on a tree with `fullNodeOrder`. The tree hash is left empty, which the game
+ * accepts from other sites (it then skips its check that the tree hasn't changed).
+ */
+function encodeLoadout({ specId, heroSubTreeId, nodes }, tree) {
+  if (!tree.fullNodeOrder?.length) return null;
+  const bits = [];
+  const put = (value, n) => {
+    for (let i = 0; i < n; i++) bits.push((value >> i) & 1);
+  };
+  put(VERSION, 8);
+  put(specId, 16);
+  put(0, 128);
+  const byId = new Map();
+  for (const key of ['classNodes', 'specNodes', 'heroNodes', 'subTreeNodes']) for (const n of tree[key] || []) byId.set(n.id, n);
+  const picks = new Map((nodes || []).map((n) => [n.nodeId, n]));
+  for (const nodeId of tree.fullNodeOrder) {
+    const node = byId.get(nodeId);
+    let pick = picks.get(nodeId);
+    if (node?.type === 'subtree') {
+      const index = node.entries.findIndex((e) => e.traitSubTreeId === heroSubTreeId);
+      pick = index >= 0 ? { entryIndex: index, rank: 1, granted: false } : null;
+    }
+    if (!node || !pick) {
+      put(0, 1);
+      continue;
+    }
+    put(1, 1);
+    if (pick.granted || node.freeNode) {
+      put(0, 1);
+      continue;
+    }
+    put(1, 1);
+    const choice = node.type === 'choice' || node.type === 'subtree';
+    const max = choice ? node.entries[pick.entryIndex]?.maxRanks || 1 : node.maxRanks || 1;
+    const partial = pick.rank > 0 && pick.rank < max;
+    put(partial ? 1 : 0, 1);
+    if (partial) put(pick.rank, 6);
+    put(choice ? 1 : 0, 1);
+    if (choice) put(pick.entryIndex, 2);
+  }
+  while (bits.length % 6) bits.push(0);
+  let out = '';
+  for (let i = 0; i < bits.length; i += 6) out += ALPHABET[bits.slice(i, i + 6).reduce((v, b, j) => v | (b << j), 0)];
+  return out;
+}
+
+module.exports = { decodeLoadout, encodeLoadout, loadoutSpecId, ALPHABET };

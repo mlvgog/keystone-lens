@@ -58,6 +58,13 @@ Get the latest version from the [**Releases**](https://github.com/mlvgog/keyston
 - **Your gear.** Each gear slot shows your item and how popular it is. Hover your item for its tooltip.
 - **Saved characters.** Realm names autocomplete. Characters you load are remembered, SimulationCraft imports included.
 
+### Raid (Warcraft Logs, optional)
+
+- **Per boss and difficulty.** Switch the class picker to **Raid**, pick a difficulty, and the app loads the top 100 logged kills of the spec on every boss of the current raid. It ranks them by damage, or by healing for healers, and reads each player's talents and gear at that kill.
+- **Same views as Mythic+.** The talent tree, popular builds (with import strings), gear and players work as they do for Mythic+. The **Boss** filter shows a single boss.
+- **Picked differently on a boss.** With a boss selected, a small card lists the talents the top players pick noticeably more or less there than on the other bosses. Those talents are ringed on the tree.
+- **Warcraft Logs client and limits.** Raid mode needs your Warcraft Logs client (see below). One raid load is about 10 lookups. Warcraft Logs also has an hourly limit you can't see, so a few raid loads in an hour can use it up. Loaded data is kept in memory for 30 minutes and never saved.
+
 ### Damage (Warcraft Logs, optional)
 
 - **Spec median per dungeon.** The median **DPS** (or **HPS**) of the spec in each dungeon, by key level or by item level, from logged keys on Warcraft Logs.
@@ -158,7 +165,8 @@ Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md).
 | `src/main/collector.js` | Builds an analysis (raw per-player data) and loads dungeons on demand |
 | `src/main/discovery.js` | Finds a spec's players in raider.io's top keys |
 | `src/main/selection.js` | Which key represents a player |
-| `src/main/simc.js`, `loadout.js`, `simcImport.js` | SimulationCraft export parsing, in-game talent string decoding, and your character from an export |
+| `src/main/simc.js`, `loadout.js`, `simcImport.js` | SimulationCraft export parsing, in-game talent strings (decode and encode), and your character from an export |
+| `src/main/raid.js`, `raidLoader.js` | Raid mode: Warcraft Logs boss rankings as a session for the views, and boss-specific talent differences |
 | `src/main/views.js` | Filtered statistics for the UI (hero tree, dungeon, build, trends) |
 | `src/main/aggregate.js`, `builds.js`, `gearSummary.js`, `itemInfo.js` | Talent and gear counting, build clustering, stat profile, item source parsing |
 | `src/main/throughput.js` | Damage and healing statistics |

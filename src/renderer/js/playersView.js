@@ -19,6 +19,27 @@ const COLUMNS = [
   { key: 'actions', label: '' },
 ];
 
+// Raid mode: a player's kill on the boss (or their best-ranked kill when all bosses are shown).
+const RAID_COLUMNS = (unit) => [
+  { key: 'rank', label: 'Rank', num: true, value: (p) => p.run.rank },
+  { key: 'name', label: 'Player', value: (p) => p.name.toLowerCase() },
+  { key: 'realm', label: 'Realm', value: (p) => `${p.realm} ${p.region}`.toLowerCase() },
+  { key: 'amount', label: unit, num: true, value: (p) => p.run.score || 0, desc: true },
+  { key: 'kill', label: 'Kill used for talents & gear', value: (p) => p.run.dungeon || '' },
+  { key: 'time', label: 'Fight time', num: true, value: (p) => p.run.duration || 0 },
+  { key: 'played', label: 'Date', value: (p) => Date.parse(p.run.completedAt) || 0, desc: true },
+  { key: 'hero', label: 'Hero tree', value: (p) => p.heroName || '' },
+  { key: 'build', label: 'Build', value: (p) => (p.buildIndex ? p.buildIndex : 999) },
+  { key: 'ilvl', label: 'iLvl', num: true, value: (p) => p.itemLevel || 0, desc: true },
+  { key: 'actions', label: '' },
+];
+
+function fightTime(ms) {
+  if (!ms) return '';
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 function linkButton(label, url, title) {
   if (!url) return null;
   return el(
@@ -40,10 +61,13 @@ function linkButton(label, url, title) {
 export function renderPlayers(container, ctx) {
   clear(container);
   const { meta, view, inspect, onInspect } = ctx;
+  const raid = meta.mode === 'raid';
+  const columns = raid ? RAID_COLUMNS(meta.metric === 'hps' ? 'HPS' : 'DPS') : COLUMNS;
+  if (raid && !columns.some((c) => c.key === state.sort)) state.sort = 'rank';
   const buildIndex = Object.fromEntries(view.builds.list.map((b) => [b.id, b.index]));
   const all = view.players.map((p) => ({ ...p, buildIndex: p.buildId ? buildIndex[p.buildId] : null }));
   const regions = [...new Set(all.map((p) => p.region))].sort();
-  const levels = all.map((p) => p.run.level);
+  const levels = all.map((p) => p.run.level).filter((l) => l != null);
   const minLevel = Math.min(...levels);
   const maxLevel = Math.max(...levels);
 
@@ -78,7 +102,7 @@ export function renderPlayers(container, ctx) {
     thead.append(
       el(
         'tr',
-        COLUMNS.map((c) => {
+        columns.map((c) => {
           const th = el(c.num ? 'th.num' : 'th', c.label);
           if (c.value) {
             th.classList.add('sortable');
@@ -99,12 +123,30 @@ export function renderPlayers(container, ctx) {
     );
   }
 
+  function raidRow(p, copy) {
+    return el(
+      'tr',
+      { onclick: () => onInspect(p.index), title: 'Inspect this player’s talents and gear at this kill' },
+      el('td.num', String(p.run.rank ?? '')),
+      el('td', { style: { color: meta.color } }, p.name),
+      el('td.dim', `${p.realm} (${String(p.region).toUpperCase()})`),
+      el('td.num', p.run.score ? Math.round(p.run.score).toLocaleString() : ''),
+      el('td', p.run.dungeon || ''),
+      el('td.num.dim', fightTime(p.run.duration)),
+      el('td.dim', relDate(p.run.completedAt)),
+      el('td', p.heroName || ''),
+      el('td.dim', p.buildIndex ? `Build ${p.buildIndex}` : 'unique'),
+      el('td.num', p.itemLevel ? p.itemLevel.toFixed(1) : ''),
+      el('td.actions', copy, linkButton('Log', p.run.url, 'Open this kill on Warcraft Logs'), linkButton('raider.io', p.links?.raiderio, 'Open raider.io profile'), linkButton('Armory', p.links?.armory, 'Open the Blizzard armory'))
+    );
+  }
+
   function renderRows() {
     const q = state.search.trim().toLowerCase();
-    const col = COLUMNS.find((c) => c.key === state.sort) || COLUMNS[0];
+    const col = columns.find((c) => c.key === state.sort) || columns[0];
     const rows = all
       .filter((p) => state.region === 'all' || p.region === state.region)
-      .filter((p) => !state.minKey || p.run.level >= state.minKey)
+      .filter((p) => raid || !state.minKey || p.run.level >= state.minKey)
       .filter((p) => !q || p.name.toLowerCase().includes(q) || p.realm.toLowerCase().includes(q))
       .sort((a, b) => {
         const va = col.value(a);
@@ -120,7 +162,9 @@ export function renderPlayers(container, ctx) {
           await window.api.copy(p.loadoutText);
           toast(`Copied ${p.name}'s talent import string`);
         });
-        const tr = el(
+        const tr = raid
+          ? raidRow(p, copy)
+          : el(
           'tr',
           { onclick: () => onInspect(p.index), title: 'Inspect this player’s talents and gear' },
           el('td.num', String(p.rank)),
@@ -143,7 +187,7 @@ export function renderPlayers(container, ctx) {
           )
         );
         if (inspect?.index === p.index) tr.classList.add('selected');
-        if (p.fallback) {
+        if (p.fallback && !raid) {
           attachTooltip(tr.children[7], () => el('div', el('div.tt-gold', 'No key on the current patch'), el('div.tt-grey', 'Talents and gear come from this player’s best key on an older patch.')));
         }
         return tr;
@@ -165,7 +209,7 @@ export function renderPlayers(container, ctx) {
   renderHead();
   renderRows();
 
-  const toolbar = el('div.players-toolbar', search, regionChips, keySel);
+  const toolbar = el('div.players-toolbar', search, regionChips, raid ? null : keySel);
   const wrap = el('div.players-wrap', el('div.inset', el('table.wow-table', thead, tbody)), footer);
   if (meta.skipped?.length && !view.dungeon) {
     wrap.append(

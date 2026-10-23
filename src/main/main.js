@@ -50,6 +50,8 @@ const { buildView, playerDetail } = require('./views');
 const throughput = require('./throughput');
 const { classifySource } = require('./itemInfo');
 const { importSimcCharacter } = require('./simcImport');
+const { loadRaid } = require('./raidLoader');
+const { bossDifferences } = require('./raid');
 
 const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
 const EXTERNAL_HOSTS = new Set([
@@ -78,6 +80,8 @@ const KIND_SOURCE = {
   wclZone: 'Warcraft Logs',
   wclRankings: 'Warcraft Logs',
   wclCharacter: 'Warcraft Logs',
+  wclRaid: 'Warcraft Logs',
+  enchantName: 'wago.tools',
   analysis: 'Analyses (built locally)',
 };
 const EMPTY_TOTALS = { requests: 0, bytes: 0, errors: 0, retries: 0, ms: 0, avgMs: 0 };
@@ -157,8 +161,16 @@ function finishTask(controller) {
 }
 
 function viewDeps() {
-  const key = session ? history.keyFor(session.meta) : null;
+  // Raid data (Warcraft Logs) is not kept on disk, so it has no trend history.
+  const key = session && session.meta.mode !== 'raid' ? history.keyFor(session.meta) : null;
   return { getSnapshot: (id) => (key ? history.get(key, id) : null) };
+}
+
+/** A view of the current session; in raid mode a boss view also lists its boss-specific picks. */
+async function sessionView(filters) {
+  const view = await buildView(session, filters, viewDeps());
+  if (session.meta.mode === 'raid' && filters?.dungeon) view.bossDiff = bossDifferences(session, session.tree, filters.dungeon);
+  return view;
 }
 
 function failure(err) {
@@ -208,10 +220,31 @@ ipcMain.handle('analyze:cancel', () => {
   current = null;
 });
 
+/** Raid mode: the top logged kills of the spec on every boss of the current raid (Warcraft Logs). */
+ipcMain.handle('raid:start', async (event, opts, { force = false } = {}) => {
+  const controller = startTask();
+  try {
+    const raid = await loadRaid(opts, {
+      signal: controller.signal,
+      force,
+      onProgress: (p) => {
+        if (!event.sender.isDestroyed() && current === controller) event.sender.send('analyze:progress', p);
+      },
+    });
+    session = raid;
+    const view = await sessionView({});
+    return { ok: true, result: { meta: session.meta, tree: session.tree, dungeonsLoaded: session.dungeonsLoaded, fromCache: false, view } };
+  } catch (err) {
+    return { ...failure(err), code: err?.code || null };
+  } finally {
+    finishTask(controller);
+  }
+});
+
 ipcMain.handle('view:get', async (_e, filters) => {
   if (!session) return failure(new Error('No analysis loaded'));
   try {
-    return { ok: true, view: await buildView(session, filters, viewDeps()) };
+    return { ok: true, view: await sessionView(filters) };
   } catch (err) {
     return failure(err);
   }
@@ -219,6 +252,8 @@ ipcMain.handle('view:get', async (_e, filters) => {
 
 ipcMain.handle('dungeon:load', async (event, zoneId, filters) => {
   if (!session) return failure(new Error('No analysis loaded'));
+  // Raid sessions load every boss up front.
+  if (session.meta.mode === 'raid') return { ok: true, view: await sessionView({ ...filters, dungeon: zoneId }), dungeonsLoaded: session.dungeonsLoaded };
   const controller = startTask();
   try {
     await loadDungeon(session, zoneId, {

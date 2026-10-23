@@ -18,7 +18,7 @@ Everything is stored in `%APPDATA%\Keystone Lens`. Nothing is uploaded.
 | Trend history (pick rates of earlier searches) | `history` | |
 | Download statistics for the developer menu | `stats.json` | Request counts and sizes per source. |
 
-Data from Warcraft Logs is **never written to disk**. It is kept in memory for up to 30 minutes and is gone when the app closes.
+Data from Warcraft Logs (damage numbers and raid kills with talents and gear) is **never written to disk**. It is kept in memory for up to 30 minutes and is gone when the app closes.
 
 ## What the app sends, and to whom
 

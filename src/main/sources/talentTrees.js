@@ -242,7 +242,7 @@ function buildTrees({ traits, nodes, edges, entryTypes, definitions, spells, ico
         continue;
       }
       node.entries = list.map((t) => entryOf(t, type));
-      node.name = node.entries.length > 1 ? node.entries.map((e) => e.name).join(' / ') : node.entries[0].name;
+      node.name = [...new Set(node.entries.map((e) => e.name))].join(' / ');
       if (first.reqPoints && first.tree !== TREE.hero) node.reqPoints = first.reqPoints;
       // The first node of each hero tree comes with choosing the hero tree.
       const free = first.tree === TREE.hero ? node.entryNode : grantedNodes.has(id) || list.some((t) => t.starterSpecs.includes(spec.id));
@@ -344,7 +344,7 @@ async function download({ signal } = {}) {
   });
 }
 
-const CACHE_KEY = 'trees-v2'; // v2: traitTreeId + fullNodeOrder
+const CACHE_KEY = 'trees-v3'; // v2: traitTreeId + fullNodeOrder; v3: apex node names once
 let inMemory = null;
 
 /**

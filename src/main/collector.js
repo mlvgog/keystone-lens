@@ -173,7 +173,7 @@ function runGetter(seasonSlug, signal) {
  * comes from and its type (Wowhead's item XML), and its stats and embellishment at the variant's
  * item level (game tables).
  */
-async function enrichItems(session, { signal, progress }) {
+async function enrichItems(session, { signal, progress, seasonDungeons = session.meta.dungeons }) {
   session.itemInfo ||= {};
   session.itemSources ||= {};
   const variants = new Map();
@@ -195,7 +195,7 @@ async function enrichItems(session, { signal, progress }) {
     [...items].map(async ([id, it]) => {
       const src = await wowhead.getItemXml(id, { signal });
       session.itemSources[id] = {
-        ...classifySource({ tier: !!it.tier, src, boss: src.droppedBy, seasonDungeons: session.meta.dungeons, raids }),
+        ...classifySource({ tier: !!it.tier, src, boss: src.droppedBy, seasonDungeons, raids }),
         slot: src.slot ?? null,
         slotType: src.slotType,
       };
@@ -466,4 +466,4 @@ async function loadDungeon(session, zoneId, { signal, onProgress } = {}) {
   return session;
 }
 
-module.exports = { analyze, loadDungeon, PHASES };
+module.exports = { analyze, loadDungeon, enrichItems, trimTree, linksFor, Progress, PHASES };

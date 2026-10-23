@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('api', {
   listSpecs: () => ipcRenderer.invoke('specs:list'),
   analyze: (opts, { force = false, allowStale = false } = {}) => ipcRenderer.invoke('analyze:start', opts, { force, allowStale }),
   analyzeCached: (opts) => ipcRenderer.invoke('analyze:cached', opts),
+  raidStart: (opts, { force = false } = {}) => ipcRenderer.invoke('raid:start', opts, { force }),
   cancel: () => ipcRenderer.invoke('analyze:cancel'),
   onProgress: (cb) => {
     const handler = (_e, p) => cb(p);
