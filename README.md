@@ -5,7 +5,8 @@
 - talent pick rates on an in-game-style talent tree;
 - popular builds with copyable import strings;
 - gear usage per slot, with stats, enchants, gems and where each item drops;
-- damage and healing per dungeon from Warcraft Logs, compared with your own runs.
+- damage and healing per dungeon from Warcraft Logs, compared with your own runs;
+- a **game addon** that shows the same pick rates, builds and gear inside World of Warcraft.
 
 ![Talent tree with pick rates for the top 50 Subtlety Rogues](docs/screenshots/talents.jpg)
 
@@ -67,6 +68,19 @@ Get the latest version from the [**Releases**](https://github.com/mlvgog/keyston
 - **Picked differently on a boss.** With a boss selected, a small card lists the talents the top players pick noticeably more or less there than on the other bosses. Those talents are ringed on the tree.
 - **Warcraft Logs client and limits.** Raid mode needs your Warcraft Logs client (see below). One raid load is about 10 lookups. Warcraft Logs also has an hourly limit you can't see, so a few raid loads in an hour can use it up. Loaded data is kept in memory for 30 minutes and never saved.
 
+### Game addon
+
+The **Keystone Lens addon** brings the Mythic+ data into the game:
+
+- **Talent window.** The pick rate of every talent appears under it, with choice splits on choice nodes. A red frame marks a popular talent you skip, and an orange frame a rare one you take. A switch in the window's title row changes between all dungeons and each dungeon. It starts on the dungeon of your keystone.
+- **Builds and gear (`/kl`).** The popular builds per dungeon, with the one closest to yours and their import strings. The most used items per slot, with your own marked, plus enchants, gems, embellishments, and their secondary stats next to yours.
+- **Item tooltips.** How many top players of your spec use an item.
+- **Your characters in the app.** The addon saves your talents and gear when you log out or `/reload`. They show up under "From the game addon" in **Compare with my character**, so you don't need to paste a SimulationCraft export.
+
+**Setting it up.** Open **⚙ Settings → Game addon**. The app finds your World of Warcraft folder, or you can choose it. Click **Install addon**, or install "Keystone Lens" from CurseForge. Every Mythic+ spec you look at is then added to the addon's data. The specs of your characters are refreshed in the background once a day. Data loads in game when you log in or `/reload`.
+
+The addon gets Mythic+ data only. Warcraft Logs data (damage, raid) stays in the app, as Warcraft Logs requires. More in [docs/ADDON.md](docs/ADDON.md).
+
 ### Damage (Warcraft Logs, optional)
 
 - **Spec median per dungeon.** The median **DPS** (or **HPS**) of the spec in each dungeon, by key level or by item level, from logged keys on Warcraft Logs.
@@ -114,6 +128,7 @@ The secret is stored only on your PC, encrypted for your Windows account, and is
 
 Everything lives in `%APPDATA%\Keystone Lens`:
 - `data-cache` holds the cache, which you can clear in Settings;
+- `addon-data.json` holds the specs sent to the game addon;
 - `history` holds trend snapshots;
 - `settings.json` holds your settings;
 - `stats.json` holds the developer-menu totals.
@@ -159,7 +174,7 @@ start.bat
 | `npm run dist:installer` / `npm run dist:portable` | Only one of them |
 | `npm run icon` | Regenerates `src/assets/icon.png` |
 
-Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md).
+Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md), the game addon in [docs/ADDON.md](docs/ADDON.md).
 
 **Optional font.** If you have WoW installed, you can copy its UI font `FRIZQT__.TTF` into `src/renderer/fonts/` for in-game-style headings when running from source. The font belongs to Blizzard, so it is not included. Without it, the bundled Marcellus font is used.
 
@@ -175,6 +190,8 @@ Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md).
 | `src/main/throughput.js` | Damage and healing statistics |
 | `src/main/history.js`, `settings.js`, `stats.js`, `cache.js` | Trend snapshots, settings, download statistics, cache |
 | `src/main/updater.js` | App updates from GitHub Releases (electron-updater; the portable exe only links to the download) |
+| `src/main/addonExport.js`, `addonSync.js`, `wow.js`, `lua.js` | Data for the game addon, the WoW folder, installing the addon, reading the characters it saves |
+| `addon/KeystoneLens/` | The game addon (Lua). See [docs/ADDON.md](docs/ADDON.md) |
 | `src/main/sources/` | raider.io, Wowhead (item XML), Warcraft Logs clients; `talentTrees.js` and `itemData.js` build talent trees and item stats from SimulationCraft and wago.tools data |
 | `src/renderer/wowhead-frame.html` | Sandboxed frame for Wowhead's tooltips script (run `node scripts/update-frame-hash.js` after editing its inline script) |
 | `src/renderer/` | UI (plain HTML, CSS and ES modules) |

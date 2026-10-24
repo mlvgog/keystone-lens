@@ -54,6 +54,17 @@
       "package.json",
       "node_modules/@fontsource/marcellus/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "addon/KeystoneLens",
+        "to": "addon/KeystoneLens",
+        "filter": [
+          "**/*",
+          "!.pkgmeta",
+          "!.release/**"
+        ]
+      }
+    ],
     "win": {
       "target": [
         "nsis",

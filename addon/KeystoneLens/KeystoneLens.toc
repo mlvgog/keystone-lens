@@ -1,0 +1,21 @@
+## Interface: 120105
+## Title: Keystone Lens
+## Notes: What the top Mythic+ players of your spec run: talent pick rates on your talent tree, popular builds, gear, enchants and gems. Data comes from the free Keystone Lens desktop app.
+## Author: Gog
+## Version: 1.0.0
+## SavedVariables: KeystoneLensDB
+## OptionalDeps: KeystoneLens_Data
+## IconTexture: Interface\Icons\inv_relics_hourglass
+## AddonCompartmentFunc: KeystoneLens_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: KeystoneLens_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: KeystoneLens_OnAddonCompartmentLeave
+## X-Website: https://github.com/mlvgog/keystone-lens
+## X-License: MIT
+
+Core.lua
+Data.lua
+Character.lua
+Tooltips.lua
+Talents.lua
+Panel.lua
+Options.lua

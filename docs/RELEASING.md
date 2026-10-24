@@ -37,6 +37,12 @@ So every release must contain `latest.yml` and `KeystoneLens-Setup-<version>.exe
 
 To review a release before it goes out, set `draft: true` in `release.yml` and publish the draft from **Releases** yourself. The updater ignores drafts, so nobody gets it until you publish.
 
+## Releasing the game addon
+
+The game addon has its own version (`## Version` in `addon/KeystoneLens/KeystoneLens.toc`) and its own tags, `addon-v<version>`. See [ADDON.md](ADDON.md#publishing-on-curseforge). The app also carries a copy of the addon, so each app release brings the addon version that is in the repository at that tag.
+
+**Never publish a GitHub release that isn't an app release as the repository's latest release.** The app's updater takes the latest GitHub release as the newest app version, and fails if it has no `latest.yml`. The addon workflow therefore uploads to CurseForge and keeps its zip as a workflow artifact, never as a GitHub release.
+
 ## Building locally
 
 ```bat

@@ -5,7 +5,7 @@
  * 5.2+ features, which test/addon.test.js checks separately.
  */
 
-const { lua, lauxlib, lualib, to_luastring } = require('fengari');
+const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require('fengari');
 
 function newState() {
   const L = lauxlib.luaL_newstate();
@@ -30,7 +30,7 @@ function toJs(L, idx, seen = new Set()) {
   if (t === lua.LUA_TBOOLEAN) return lua.lua_toboolean(L, idx);
   if (t === lua.LUA_TNUMBER) return lua.lua_tonumber(L, idx);
   if (t === lua.LUA_TSTRING) return lua.lua_tojsstring(L, idx);
-  if (t !== lua.LUA_TTABLE) return `<${lua.lua_typename(L, t)}>`;
+  if (t !== lua.LUA_TTABLE) return `<${to_jsstring(lua.lua_typename(L, t))}>`;
   const abs = lua.lua_absindex(L, idx);
   const ptr = lua.lua_topointer(L, abs);
   if (seen.has(ptr)) return '<cycle>';

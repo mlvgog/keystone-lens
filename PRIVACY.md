@@ -17,6 +17,15 @@ Everything is stored in `%APPDATA%\Keystone Lens`. Nothing is uploaded.
 | Cached public data from raider.io, Wowhead, wago.tools and SimulationCraft | `data-cache` | Clear it in ⚙ Settings → Clear cache. |
 | Trend history (pick rates of earlier searches) | `history` | |
 | Download statistics for the developer menu | `stats.json` | Request counts and sizes per source. |
+| Specs sent to the game addon (pick rates, builds, gear of the top players) | `addon-data.json` | Public Mythic+ data only. |
+| Your World of Warcraft folder | `settings.json` | Found through the Windows registry or the usual install folders, or chosen by you. |
+
+## The game addon
+
+If you use the Keystone Lens game addon, two more things happen on your PC. Nothing is uploaded.
+
+- **The app writes** the addon's data to `World of Warcraft\_retail_\Interface\AddOns\KeystoneLens_Data`. When you click **Install addon**, it also copies the addon to `Interface\AddOns\KeystoneLens`. It writes nowhere else in the game folder.
+- **The addon saves** your characters' name, realm, region, spec, item level, talents and equipped gear in the game's SavedVariables file (`WTF\Account\<account>\SavedVariables\KeystoneLens.lua`). The app only reads that file, to list your characters in "Compare with my character". Remove a character by deleting that file while the game is closed.
 
 Data from Warcraft Logs (damage numbers and raid kills with talents and gear) is **never written to disk**. It is kept in memory for up to 30 minutes and is gone when the app closes.
 

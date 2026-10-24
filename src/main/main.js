@@ -406,6 +406,7 @@ ipcMain.handle('settings:set', (_e, patch) => {
   settings.set(patch, LOCALE_IDS);
   if ('wclClientId' in patch || 'wclClientSecret' in patch) wcl.forgetToken();
   if ('updates' in patch) updater?.setMode(settings.get().updates);
+  if (patch.addonSync === false) addonSync?.pause(); // stop a refresh that is running
   if (patch.addonSync === true) addonSync?.resume();
   return settings.getPublic();
 });
