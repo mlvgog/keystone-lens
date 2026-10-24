@@ -10,7 +10,7 @@ const BASE = 'https://raider.io';
  * already started in the US. Expansions are probed from newest to oldest.
  */
 async function getCurrentSeason({ signal, force } = {}) {
-  return cache.cached('season', 'current-v2', async () => {
+  return cache.cached('season', 'current-v3', async () => {
     const now = Date.now();
     for (let expansion = 16; expansion >= 9; expansion--) {
       let data;
@@ -30,7 +30,8 @@ async function getCurrentSeason({ signal, force } = {}) {
           name: s.name,
           shortName: s.short_name,
           expansionId: expansion,
-          dungeons: (s.dungeons || []).map((d) => ({ id: d.id, name: d.name, shortName: d.short_name, slug: d.slug })),
+          // challengeModeId is the game's keystone map ID (lets the addon find your key's dungeon).
+          dungeons: (s.dungeons || []).map((d) => ({ id: d.id, name: d.name, shortName: d.short_name, slug: d.slug, challengeModeId: d.challenge_mode_id ?? null })),
         };
       }
     }

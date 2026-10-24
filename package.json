@@ -82,6 +82,7 @@
   },
   "devDependencies": {
     "electron": "^44.9.1",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "fengari": "^0.1.5"
   }
 }

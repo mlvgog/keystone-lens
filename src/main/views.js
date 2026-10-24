@@ -52,6 +52,7 @@ async function buildView(session, filters, deps = {}) {
       heroSubTreeId: b.heroSubTreeId,
       heroName: heroNames[b.heroSubTreeId] || null,
       medoidName: b.medoidName,
+      medoidIndex: base[b.medoid].index,
       loadoutText: b.loadoutText,
       members: b.members.map((i) => base[i].index),
       diffs: buildDiffs(tree, stats.nodes, baseTalents.nodes).slice(0, 8),

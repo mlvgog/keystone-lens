@@ -65,3 +65,17 @@ test('the update mode defaults to automatic and only accepts known modes', () =>
   settings.init(dir, [0]);
   assert.equal(settings.getPublic().updates, 'off', 'saved and visible to the window');
 });
+
+test('game folder and background refresh settings', () => {
+  const dir = tempDir();
+  settings.init(dir, [0]);
+  assert.equal(settings.get().wowPath, '');
+  assert.equal(settings.get().addonSync, true);
+  settings.set({ wowPath: 'C:\\Games\\World of Warcraft\\_retail_', addonSync: false });
+  settings.init(dir, [0]);
+  assert.equal(settings.get().wowPath, 'C:\\Games\\World of Warcraft\\_retail_');
+  assert.equal(settings.get().addonSync, false);
+  settings.set({ wowPath: 42, addonSync: 'yes' });
+  assert.equal(settings.get().wowPath, '');
+  assert.equal(settings.get().addonSync, true);
+});

@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULTS = { tooltipLocale: 0, defaultRegion: 'world', defaultSize: 50, wclClientId: '', wclClientSecret: '', updates: 'auto' };
+const DEFAULTS = { tooltipLocale: 0, defaultRegion: 'world', defaultSize: 50, wclClientId: '', wclClientSecret: '', updates: 'auto', wowPath: '', addonSync: true };
 const REGIONS = ['world', 'us', 'eu', 'kr', 'tw'];
 const SIZES = [25, 50, 100];
 // auto: download and install updates; notify: only say a new version is out; off: never check on its own.
@@ -53,6 +53,10 @@ function sanitize(s, validLocales) {
     wclClientId: credential(s.wclClientId),
     wclClientSecret: credential(s.wclClientSecret),
     updates: UPDATE_MODES.includes(s.updates) ? s.updates : DEFAULTS.updates,
+    // The game's _retail_ folder (checked by wow.normalizeWowFolder before it is saved).
+    wowPath: typeof s.wowPath === 'string' && s.wowPath.length <= 500 ? s.wowPath : DEFAULTS.wowPath,
+    // Refresh your addon characters' specs in the background.
+    addonSync: typeof s.addonSync === 'boolean' ? s.addonSync : DEFAULTS.addonSync,
   };
 }
 

@@ -1881,8 +1881,15 @@ table.ov-table {
 .modal-title .wow-header {
   font-size: 17px;
 }
+.modal {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+}
 .modal-body {
   padding: 14px 18px 18px;
+  overflow-y: auto;
+  min-height: 0;
 }
 .dialog-form {
   display: flex;
@@ -1932,6 +1939,47 @@ table.ov-table {
 .update-row .wow-btn {
   flex: none;
   white-space: nowrap;
+}
+.dialog-form label.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.check-row input {
+  accent-color: var(--gold-dark);
+  margin: 0;
+}
+.addon-folder {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.addon-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.addon-spec {
+  display: flex;
+  align-items: center;
+}
+.addon-spec .faint {
+  flex: 1;
+  margin-left: 2px;
+}
+.addon-spec .chip-x {
+  color: var(--text-faint);
+  padding: 0 6px;
+}
+.addon-spec .chip-x:hover {
+  color: #ff8a7a;
 }
 .about p {
   margin: 6px 0 0;
@@ -2259,6 +2307,14 @@ table.dev-table {
   margin-left: 6px;
   color: #8fd3ff;
   border: 1px solid #2e6d92;
+  border-radius: 3px;
+}
+.tag.addon {
+  font-size: 10px;
+  padding: 0 4px;
+  margin-left: 6px;
+  color: #ffd27a;
+  border: 1px solid #8a6a2a;
   border-radius: 3px;
 }
 .compare-modes {
