@@ -1,0 +1,9 @@
+# BigWigs packager settings (see docs/ADDON.md). The packager runs with addon/KeystoneLens as its top directory.
+package-as: KeystoneLens
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+ignore:
+  - .release

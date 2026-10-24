@@ -1,6 +1,8 @@
 import { el, toast } from './util.js';
 import { hideTooltip } from './tooltip.js';
 import { attachAutocomplete, matchItems, fold } from './autocomplete.js';
+import { updateStatusText, updateAction } from './updates.js';
+import { addonSection } from './addonSettings.js';
 
 const REPO_URL = 'https://github.com/mlvgog/keystone-lens';
 
@@ -133,6 +135,36 @@ export function compareDialog({ getSaved, meta, classColor, onLoaded, onForget, 
   }
   renderSaved();
 
+  // Characters the game addon saved: always their current talents and gear, no paste needed.
+  const addonLabel = el('div.saved-label.fb-label', { hidden: true }, 'From the game addon');
+  const addonRow = el('div.saved-chars', { hidden: true });
+  window.api.addonCharacters().then(
+    (list) => {
+      if (!list?.length) return;
+      const sorted = [...list].sort((a, b) => (b.className === meta.className) - (a.className === meta.className) || b.time - a.time);
+      addonRow.replaceChildren(
+        ...sorted.map((c) => {
+          const other = c.className && c.className !== meta.className;
+          const chip = el(
+            'div.saved-char',
+            {
+              title: other ? `${c.className} — this analysis is for ${meta.className}` : `Load ${c.name} as the addon last saved them`,
+              onclick: () => importSimc(c.simc, 0),
+            },
+            el('span', { style: { color: classColor(c.className) } }, c.name),
+            el('span.faint', ` ${[c.specName, c.realm].filter(Boolean).join(' · ')}`),
+            el('span.tag.addon', 'Addon')
+          );
+          if (other) chip.classList.add('other-class');
+          return chip;
+        })
+      );
+      addonLabel.hidden = false;
+      addonRow.hidden = false;
+    },
+    () => {}
+  );
+
   /** A loaded character: apply it, or keep it for later when it is another class. */
   function loaded(c, who) {
     if (c.className !== meta.className) {
@@ -226,6 +258,8 @@ export function compareDialog({ getSaved, meta, classColor, onLoaded, onForget, 
     el(
       'div.dialog-form',
       el('p.dim', 'Your talents and gear are shown on top of what the top players use: looked up on raider.io, or pasted from the SimulationCraft addon.'),
+      addonLabel,
+      addonRow,
       el('div.saved-label.fb-label', 'Saved characters'),
       savedRow,
       el('div.dialog-sep'),
@@ -337,6 +371,40 @@ export async function settingsDialog({ onChanged }) {
     'Get a free API client'
   );
 
+  // Updates (see src/main/updater.js).
+  const updates = el(
+    'select.wow-select',
+    {},
+    [['auto', 'Automatic (recommended)'], ['notify', 'Only tell me'], ['off', 'Off']].map(([v, l]) => el('option', { value: v }, l))
+  );
+  updates.value = settings.updates || 'auto';
+  updates.addEventListener('change', () => save({ updates: updates.value }));
+  const updateLine = el('div.dialog-status');
+  const updateBtn = el('button.wow-btn.small');
+  let updateStatus = null;
+  const showUpdate = (s) => {
+    updateStatus = s;
+    updateLine.className = `dialog-status ${s?.state === 'error' ? 'bad' : s?.state === 'ready' || s?.state === 'available' ? 'good' : ''}`;
+    updateLine.textContent = updateStatusText(s);
+    const action = updateAction(s);
+    updateBtn.textContent = action ? action.label : 'Check now';
+    updateBtn.disabled = s?.state === 'disabled' || s?.state === 'checking' || s?.state === 'downloading';
+  };
+  updateBtn.addEventListener('click', () => {
+    const action = updateAction(updateStatus);
+    if (action) action.run();
+    else window.api.checkUpdate();
+  });
+  const stopUpdates = window.api.onUpdateStatus(showUpdate);
+  window.api.updateStatus().then((s) => updateStatus || showUpdate(s), () => {});
+
+  const addon = addonSection({
+    autoRefresh: settings.addonSync !== false,
+    onAutoRefresh: (on) => save({ addonSync: on }),
+    autoUpdate: settings.addonAutoUpdate !== false,
+    onAutoUpdate: (on) => save({ addonAutoUpdate: on }),
+  });
+
   const dev = el(
     'button.wow-btn.small',
     {
@@ -368,6 +436,16 @@ export async function settingsDialog({ onChanged }) {
       el('div.dialog-buttons', wclRemove, wclSave),
       el('p.faint.small', 'Stored only on this PC (the secret encrypted for your Windows account) and only sent to warcraftlogs.com. Warcraft Logs data is never saved to disk.'),
       el('div.dialog-sep'),
+      addon.node,
+      el('div.dialog-sep'),
+      el('div.wow-header', 'Updates'),
+      el('label', 'App updates', updates),
+      el('div.setting-row.update-row', updateLine, updateBtn),
+      el(
+        'p.faint.small',
+        'New versions come from the GitHub releases of this project. Automatic downloads them in the background and installs them when you restart. Off never checks on its own.'
+      ),
+      el('div.dialog-sep'),
       el(
         'div.about',
         el('div.setting-row', el('div.wow-header', `About · Keystone Lens ${version}`), dev),
@@ -386,7 +464,13 @@ export async function settingsDialog({ onChanged }) {
         )
       )
     ),
-    { width: 540 }
+    {
+      width: 540,
+      onClose: () => {
+        stopUpdates();
+        addon.dispose();
+      },
+    }
   );
 }
 

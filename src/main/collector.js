@@ -372,7 +372,7 @@ async function analyze(opts, { signal, onProgress, force = false, allowStale = f
       specIcon,
       region,
       season: { slug: season.slug, name: season.name, expansionId: season.expansionId },
-      dungeons: season.dungeons.map((d) => ({ id: d.id, name: d.name, shortName: d.shortName })),
+      dungeons: season.dungeons.map((d) => ({ id: d.id, name: d.name, shortName: d.shortName, challengeModeId: d.challengeModeId ?? null })),
       patch,
       since,
       requested: sampleSize,

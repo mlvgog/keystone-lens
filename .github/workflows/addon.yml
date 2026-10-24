@@ -1,0 +1,57 @@
+name: Addon
+
+# Push a tag like addon-v1.0.0 (matching "## Version" in addon/KeystoneLens/KeystoneLens.toc)
+# to package the game addon and upload it to CurseForge. See docs/ADDON.md.
+#
+# The addon is not published as a GitHub release: the app's updater takes the repository's
+# latest GitHub release as the newest app version.
+on:
+  push:
+    tags: ['addon-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the packager reads tags
+
+      - name: Check that the tag matches the addon version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version="$(sed -n 's/^## Version: *//p' addon/KeystoneLens/KeystoneLens.toc | tr -d '\r')"
+          if [ "addon-v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match ## Version: $version"
+            exit 1
+          fi
+
+      - name: Lint with Lua 5.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 lua-check
+          luacheck addon/KeystoneLens --config addon/.luacheckrc
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts # no Electron download needed
+      - run: node --test test/addon.test.js test/addonExport.test.js
+
+      # Uploads to CurseForge when the CF_API_TOKEN secret is set and the .toc has
+      # "## X-Curse-Project-ID"; otherwise it only builds the zip. Manual runs never upload (-d).
+      - uses: BigWigsMods/packager@v2
+        with:
+          args: -t addon/KeystoneLens ${{ startsWith(github.ref, 'refs/tags/') && ' ' || '-d' }}
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KeystoneLens-addon
+          path: addon/KeystoneLens/.release/*.zip

@@ -9,6 +9,8 @@ import { renderPlayers } from './playersView.js';
 import { renderThroughput } from './throughputView.js';
 import { renderFilterBar } from './filterBar.js';
 import { compareDialog, settingsDialog, devDialog } from './dialogs.js';
+import { initUpdateNotice } from './updates.js';
+import { initAddonNotice } from './addonNotice.js';
 
 const viewEl = document.getElementById('view');
 const tabs = document.getElementById('tabs');
@@ -673,14 +675,18 @@ function applyTooltipLanguage() {
 
 (async function boot() {
   initWowheadTooltips();
+  let version = '';
   try {
     const res = await window.api.getSettings();
     state.settings = res.settings;
     state.locales = res.locales;
+    version = res.version;
   } catch {
     state.settings = null;
   }
   applyTooltipLanguage();
+  initUpdateNotice(document.getElementById('update-notice'), { getMode: () => state.settings?.updates || 'auto' });
+  initAddonNotice(document.getElementById('notices'), document.querySelector('[data-action=settings]'), { version, openSettings });
   const last = loadPrefs().last;
   if (last && last.mode !== 'raid') {
     const res = await window.api.analyzeCached(last);

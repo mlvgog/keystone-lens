@@ -1,7 +1,7 @@
 {
   "name": "keystone-lens",
   "productName": "Keystone Lens",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "See what the top Mythic+ players run: talent pick rates, popular builds, gear and damage per dungeon for every World of Warcraft spec. Data from raider.io, Wowhead and Warcraft Logs.",
   "keywords": [
     "world-of-warcraft",
@@ -42,10 +42,28 @@
     "directories": {
       "output": "dist"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "mlvgog",
+        "repo": "keystone-lens"
+      }
+    ],
     "files": [
       "src/**/*",
       "package.json",
       "node_modules/@fontsource/marcellus/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "addon/KeystoneLens",
+        "to": "addon/KeystoneLens",
+        "filter": [
+          "**/*",
+          "!.pkgmeta",
+          "!.release/**"
+        ]
+      }
     ],
     "win": {
       "target": [
@@ -70,10 +88,12 @@
     }
   },
   "dependencies": {
-    "@fontsource/marcellus": "^5.3.0"
+    "@fontsource/marcellus": "^5.3.0",
+    "electron-updater": "^6.8.10"
   },
   "devDependencies": {
     "electron": "^44.9.1",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "fengari": "^0.1.5"
   }
 }

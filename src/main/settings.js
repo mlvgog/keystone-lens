@@ -3,9 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULTS = { tooltipLocale: 0, defaultRegion: 'world', defaultSize: 50, wclClientId: '', wclClientSecret: '' };
+const DEFAULTS = { tooltipLocale: 0, defaultRegion: 'world', defaultSize: 50, wclClientId: '', wclClientSecret: '', updates: 'auto', wowPath: '', addonSync: true, addonAutoUpdate: true };
 const REGIONS = ['world', 'us', 'eu', 'kr', 'tw'];
 const SIZES = [25, 50, 100];
+// auto: download and install updates; notify: only say a new version is out; off: never check on its own.
+const UPDATE_MODES = ['auto', 'notify', 'off'];
 
 let file = null;
 let data = { ...DEFAULTS };
@@ -50,6 +52,13 @@ function sanitize(s, validLocales) {
     defaultSize: SIZES.includes(Number(s.defaultSize)) ? Number(s.defaultSize) : DEFAULTS.defaultSize,
     wclClientId: credential(s.wclClientId),
     wclClientSecret: credential(s.wclClientSecret),
+    updates: UPDATE_MODES.includes(s.updates) ? s.updates : DEFAULTS.updates,
+    // The game's _retail_ folder (checked by wow.normalizeWowFolder before it is saved).
+    wowPath: typeof s.wowPath === 'string' && s.wowPath.length <= 500 ? s.wowPath : DEFAULTS.wowPath,
+    // Refresh your addon characters' specs in the background.
+    addonSync: typeof s.addonSync === 'boolean' ? s.addonSync : DEFAULTS.addonSync,
+    // Replace the addon copy the app installed when the app has a newer build of it.
+    addonAutoUpdate: typeof s.addonAutoUpdate === 'boolean' ? s.addonAutoUpdate : DEFAULTS.addonAutoUpdate,
   };
 }
 

@@ -36,4 +36,25 @@ contextBridge.exposeInMainWorld('api', {
   copy: (text) => ipcRenderer.invoke('clipboard:write', text),
   openExternal: (url) => ipcRenderer.invoke('open:external', url),
   windowControl: (action) => ipcRenderer.invoke('window:control', action),
+  addonStatus: () => ipcRenderer.invoke('addon:status'),
+  addonChooseFolder: () => ipcRenderer.invoke('addon:chooseFolder'),
+  addonInstall: () => ipcRenderer.invoke('addon:install'),
+  addonRescan: () => ipcRenderer.invoke('addon:rescan'),
+  addonWrite: () => ipcRenderer.invoke('addon:write'),
+  addonRemoveSpec: (specId) => ipcRenderer.invoke('addon:removeSpec', specId),
+  addonCharacters: () => ipcRenderer.invoke('addon:characters'),
+  onAddonStatus: (cb) => {
+    const handler = (_e, s) => cb(s);
+    ipcRenderer.on('addon:status', handler);
+    return () => ipcRenderer.removeListener('addon:status', handler);
+  },
+  updateStatus: () => ipcRenderer.invoke('update:status'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateStatus: (cb) => {
+    const handler = (_e, s) => cb(s);
+    ipcRenderer.on('update:status', handler);
+    return () => ipcRenderer.removeListener('update:status', handler);
+  },
 });

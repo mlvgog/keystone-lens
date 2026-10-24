@@ -53,6 +53,9 @@ const { importSimcCharacter } = require('./simcImport');
 const { loadRaid } = require('./raidLoader');
 const { bossDifferences } = require('./raid');
 const { characterStatProfile } = require('./gearSummary');
+const http = require('./http');
+const { createUpdater, LATEST_RELEASE_API } = require('./updater');
+const { createAddonSync } = require('./addonSync');
 
 const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
 const EXTERNAL_HOSTS = new Set([
@@ -109,6 +112,8 @@ let win = null;
 let current = null; // AbortController of the running analysis / dungeon load
 let session = null; // the analysis currently shown
 let throughputTask = null; // AbortController of the running Warcraft Logs load
+let updater = null;
+let addonSync = null; // the game addon's data (see addonSync.js)
 
 function createWindow() {
   win = new BrowserWindow({
@@ -152,13 +157,16 @@ function openExternal(url) {
 
 function startTask() {
   current?.abort();
+  addonSync?.pause(); // your search goes first; the addon's background refresh waits
   const controller = new AbortController();
   current = controller;
   return controller;
 }
 
 function finishTask(controller) {
-  if (current === controller) current = null;
+  if (current !== controller) return;
+  current = null;
+  addonSync?.resume();
 }
 
 function viewDeps() {
@@ -195,6 +203,7 @@ ipcMain.handle('analyze:start', async (event, opts, { force = false, allowStale 
     session = res.session;
     const view = await buildView(session, {}, viewDeps());
     if (!res.fromCache) await history.save(history.keyFor(session.meta), history.snapshotOf(view, session.meta));
+    addonSync?.recordSession(session);
     return { ok: true, result: { meta: session.meta, tree: session.tree, dungeonsLoaded: session.dungeonsLoaded || [], fromCache: res.fromCache, view } };
   } catch (err) {
     return failure(err);
@@ -264,6 +273,7 @@ ipcMain.handle('dungeon:load', async (event, zoneId, filters) => {
       },
     });
     const view = await buildView(session, { ...filters, dungeon: zoneId }, viewDeps());
+    addonSync?.recordSession(session);
     return { ok: true, view, dungeonsLoaded: session.dungeonsLoaded };
   } catch (err) {
     return failure(err);
@@ -395,8 +405,128 @@ ipcMain.handle('settings:get', () => ({ settings: settings.getPublic(), locales:
 ipcMain.handle('settings:set', (_e, patch) => {
   settings.set(patch, LOCALE_IDS);
   if ('wclClientId' in patch || 'wclClientSecret' in patch) wcl.forgetToken();
+  if ('updates' in patch) updater?.setMode(settings.get().updates);
+  if (patch.addonSync === false) addonSync?.pause(); // stop a refresh that is running
+  if (patch.addonSync === true) addonSync?.resume();
+  if (patch.addonAutoUpdate === true) addonSync?.rescan().catch(() => {}); // update now if needed
   return settings.getPublic();
 });
+
+/**
+ * Updates from GitHub Releases (see updater.js). The installed app updates itself with
+ * electron-updater; the portable exe (electron-builder sets PORTABLE_EXECUTABLE_FILE) can
+ * only point to the download page. Running from source never checks.
+ */
+function initUpdater() {
+  const portable = !!process.env.PORTABLE_EXECUTABLE_FILE;
+  let autoUpdater = null;
+  if (app.isPackaged && !portable) {
+    try {
+      ({ autoUpdater } = require('electron-updater'));
+    } catch {
+      // no updater: the app works as before
+    }
+  }
+  updater = createUpdater({
+    currentVersion: app.getVersion(),
+    packaged: app.isPackaged,
+    portable,
+    autoUpdater,
+    fetchLatest: () => http.fetchJson(LATEST_RELEASE_API, { retries: 1, headers: { Accept: 'application/vnd.github+json' } }),
+    onStatus: (status) => {
+      if (win && !win.isDestroyed()) win.webContents.send('update:status', status);
+    },
+  });
+  updater.start(settings.get().updates);
+}
+
+/** The addon that ships with the app (resources/addon/KeystoneLens; the repository folder from source). */
+function bundledAddonDir() {
+  return app.isPackaged ? path.join(process.resourcesPath, 'addon', 'KeystoneLens') : path.join(__dirname, '..', '..', 'addon', 'KeystoneLens');
+}
+
+/** analyze() options for a spec, with the default region and player count from Settings. */
+async function specOptions(specId) {
+  const classes = buildClassList(await talentTrees.getTalentData());
+  for (const c of classes) {
+    const s = c.specs.find((x) => x.specId === Number(specId));
+    if (!s) continue;
+    const { defaultRegion, defaultSize } = settings.get();
+    return {
+      classSlug: c.classSlug,
+      className: c.className,
+      color: c.color,
+      specSlug: s.specSlug,
+      specName: s.specName,
+      specId: s.specId,
+      specIcon: s.icon,
+      region: defaultRegion,
+      sampleSize: defaultSize,
+      since: null,
+    };
+  }
+  return null;
+}
+
+function initAddonSync() {
+  addonSync = createAddonSync({
+    userData: app.getPath('userData'),
+    settings: { get: settings.get, set: (patch) => settings.set(patch, LOCALE_IDS) },
+    bundledAddonDir: bundledAddonDir(),
+    appVersion: app.getVersion(),
+    specOptions,
+    analyze,
+    loadDungeon,
+    onStatus: (status) => {
+      if (win && !win.isDestroyed()) win.webContents.send('addon:status', status);
+    },
+  });
+  addonSync.init().catch(() => {});
+}
+
+/** Runs an addon action; errors come back as { ok: false, error }. */
+async function addonAction(fn) {
+  try {
+    return { ok: true, status: await fn() };
+  } catch (err) {
+    return { ...failure(err), status: addonSync?.status() ?? null };
+  }
+}
+
+ipcMain.handle('addon:status', () => addonSync?.status() ?? null);
+ipcMain.handle('addon:chooseFolder', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Choose your World of Warcraft folder',
+    defaultPath: settings.get().wowPath || undefined,
+    properties: ['openDirectory'],
+  });
+  if (canceled || !filePaths?.[0]) return { ok: false, cancelled: true, status: addonSync.status() };
+  return addonAction(() => addonSync.setWowPath(filePaths[0]));
+});
+ipcMain.handle('addon:install', () => addonAction(() => addonSync.installAddon()));
+ipcMain.handle('addon:rescan', () => addonAction(() => addonSync.rescan()));
+ipcMain.handle('addon:write', () => addonAction(async () => (await addonSync.writeData(), addonSync.status())));
+ipcMain.handle('addon:removeSpec', (_e, specId) => addonAction(() => addonSync.removeSpec(Number(specId))));
+/** The addon's characters, with English class and spec names (the game saves them in its own language). */
+ipcMain.handle('addon:characters', async () => {
+  const list = addonSync?.addonCharacters() ?? [];
+  let classes = [];
+  try {
+    classes = buildClassList(await talentTrees.getTalentData());
+  } catch {
+    // keep the names the addon saved
+  }
+  return list.map((c) => {
+    const cls = classes.find((x) => x.specs.some((s) => s.specId === c.specId));
+    const spec = cls?.specs.find((s) => s.specId === c.specId);
+    return { ...c, className: cls?.className || c.className, specName: spec?.specName || c.specName };
+  });
+});
+
+ipcMain.handle('update:status', () => updater?.getStatus() ?? { state: 'disabled' });
+ipcMain.handle('update:check', () => updater?.check({ user: true }));
+ipcMain.handle('update:download', () => updater?.download());
+ipcMain.handle('update:install', () => updater?.install() ?? false);
 
 const MAX_LEVELS = 15;
 
@@ -575,6 +705,8 @@ app.whenReady().then(() => {
   trackIconDownloads();
   settings.init(userData, LOCALE_IDS, { vault: secretVault() });
   createWindow();
+  initUpdater();
+  initAddonSync();
 });
 
 app.on('window-all-closed', () => app.quit());

@@ -52,3 +52,41 @@ test('a secret that cannot be decrypted (other user or PC) is dropped', () => {
   assert.equal(settings.get().wclClientSecret, '');
   assert.equal(settings.get().wclClientId, 'client');
 });
+
+test('the update mode defaults to automatic and only accepts known modes', () => {
+  const dir = tempDir();
+  settings.init(dir, [0]);
+  assert.equal(settings.get().updates, 'auto');
+  settings.set({ updates: 'notify' });
+  assert.equal(settings.get().updates, 'notify');
+  settings.set({ updates: 'sometimes' });
+  assert.equal(settings.get().updates, 'auto');
+  settings.set({ updates: 'off' });
+  settings.init(dir, [0]);
+  assert.equal(settings.getPublic().updates, 'off', 'saved and visible to the window');
+});
+
+test('game folder and background refresh settings', () => {
+  const dir = tempDir();
+  settings.init(dir, [0]);
+  assert.equal(settings.get().wowPath, '');
+  assert.equal(settings.get().addonSync, true);
+  settings.set({ wowPath: 'C:\\Games\\World of Warcraft\\_retail_', addonSync: false });
+  settings.init(dir, [0]);
+  assert.equal(settings.get().wowPath, 'C:\\Games\\World of Warcraft\\_retail_');
+  assert.equal(settings.get().addonSync, false);
+  settings.set({ wowPath: 42, addonSync: 'yes' });
+  assert.equal(settings.get().wowPath, '');
+  assert.equal(settings.get().addonSync, true);
+});
+
+test('the addon updates itself unless turned off', () => {
+  const dir = tempDir();
+  settings.init(dir, [0]);
+  assert.equal(settings.get().addonAutoUpdate, true);
+  settings.set({ addonAutoUpdate: false });
+  settings.init(dir, [0]);
+  assert.equal(settings.get().addonAutoUpdate, false);
+  settings.set({ addonAutoUpdate: 'no' });
+  assert.equal(settings.get().addonAutoUpdate, true);
+});
