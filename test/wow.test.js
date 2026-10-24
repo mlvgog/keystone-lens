@@ -48,19 +48,51 @@ test('the install path comes from the registry', async () => {
 
 test('the bundled addon is installed, updated, and never replaces a newer copy', async () => {
   const { retail } = fakeGame();
+  const addonDir = path.join(retail, 'Interface', 'AddOns', 'KeystoneLens');
   const v1 = bundledAddon('1.0.0');
-  assert.deepEqual(await wow.addonStatus(retail, v1), { installed: null, bundled: '1.0.0', action: 'install' });
+  assert.deepEqual(await wow.addonStatus(retail, v1), { installed: null, bundled: '1.0.0', managed: false, differs: false, action: 'install' });
   assert.equal(await wow.installAddon(retail, v1), '1.0.0');
-  assert.deepEqual(await wow.addonStatus(retail, v1), { installed: '1.0.0', bundled: '1.0.0', action: null });
+  assert.deepEqual(await wow.addonStatus(retail, v1), { installed: '1.0.0', bundled: '1.0.0', managed: true, differs: false, action: null });
+  const marker = JSON.parse(fs.readFileSync(path.join(addonDir, '.installed-by-keystone-lens'), 'utf8'));
+  assert.equal(marker.version, '1.0.0');
+  assert.equal(marker.fingerprint, await wow.addonFingerprint(v1));
 
   const v2 = bundledAddon('1.1.0');
   assert.equal((await wow.addonStatus(retail, v2)).action, 'update');
   assert.equal(await wow.installAddon(retail, v2), '1.1.0');
-  assert.equal(fs.readFileSync(path.join(retail, 'Interface', 'AddOns', 'KeystoneLens', 'Core.lua'), 'utf8'), '-- 1.1.0\n');
+  assert.equal(fs.readFileSync(path.join(addonDir, 'Core.lua'), 'utf8'), '-- 1.1.0\n');
   assert.deepEqual(fs.readdirSync(path.join(retail, 'Interface', 'AddOns')), ['KeystoneLens'], 'no temporary folders left');
 
   assert.equal((await wow.addonStatus(retail, v1)).action, null, 'an older bundled copy leaves the newer one alone');
   assert.equal((await wow.addonStatus(null, v1)).action, null, 'nothing to do without a game folder');
+});
+
+test('a new build with the same version number is an update too', async () => {
+  const { retail } = fakeGame();
+  const addonDir = path.join(retail, 'Interface', 'AddOns', 'KeystoneLens');
+  const first = bundledAddon('1.0.0');
+  // Installed by hand (or by an app version without the marker): same version, other files.
+  fs.cpSync(first, addonDir, { recursive: true });
+  const rebuilt = bundledAddon('1.0.0');
+  fs.writeFileSync(path.join(rebuilt, 'Panel.lua'), '-- the redesigned window\n');
+  assert.deepEqual(await wow.addonStatus(retail, rebuilt), { installed: '1.0.0', bundled: '1.0.0', managed: false, differs: true, action: 'update' });
+
+  await wow.installAddon(retail, rebuilt);
+  const status = await wow.addonStatus(retail, rebuilt);
+  assert.equal(status.action, null);
+  assert.equal(status.managed, true);
+});
+
+test('the fingerprint ignores dotfiles and line endings', async () => {
+  const a = bundledAddon('1.0.0');
+  const b = bundledAddon('1.0.0');
+  fs.writeFileSync(path.join(b, '.pkgmeta'), 'package-as: KeystoneLens\n');
+  fs.writeFileSync(path.join(b, 'Core.lua'), '-- 1.0.0\r\n');
+  assert.equal(await wow.addonFingerprint(a), await wow.addonFingerprint(b));
+  fs.mkdirSync(path.join(b, 'Media'));
+  fs.writeFileSync(path.join(b, 'Media', 'icon.tga'), Buffer.from([1, 2, 3]));
+  assert.notEqual(await wow.addonFingerprint(a), await wow.addonFingerprint(b), 'files in subfolders count');
+  assert.equal(await wow.addonFingerprint(path.join(os.tmpdir(), 'no-such-addon')), null);
 });
 
 test('characters are read from every account, the newest save winning', async () => {

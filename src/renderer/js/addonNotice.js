@@ -1,5 +1,6 @@
 // Tells you about the game addon while it isn't installed (or is outdated): a banner under the
-// title bar with Install / Not now, and a dot on the ⚙ button. See src/main/addonSync.js.
+// title bar with Install / Not now, and a dot on the ⚙ button. Also says when the app has
+// updated the addon by itself. See src/main/addonSync.js.
 import { el, toast } from './util.js';
 
 const DISMISSED_KEY = 'keystone-lens-addon-notice'; // app version in which "Not now" was clicked
@@ -72,21 +73,26 @@ export async function initAddonNotice(container, settingsButton, { version, open
     const update = kind === 'update';
     const action = el('button.wow-btn.small', update ? 'Update addon' : 'Install addon');
     action.addEventListener('click', () => install(action));
-    return el(
-      'div.banner.addon-banner',
-      update
-        ? el('span', el('b', 'A newer game addon comes with this app'), ` (installed: ${status.addon.installed}, new: ${status.addon.bundled}).`)
-        : el('span', el('b', 'Keystone Lens has a game addon. '), WHAT),
-      el('div.banner-actions', action, notNow)
-    );
+    const a = status.addon;
+    let text = el('span', el('b', 'Keystone Lens has a game addon. '), WHAT);
+    if (update && a.differs) text = el('span', el('b', 'This app has a newer build of the game addon'), ` than the one installed (${a.installed}).`);
+    else if (update) text = el('span', el('b', 'A newer game addon comes with this app'), ` (installed: ${a.installed}, new: ${a.bundled}).`);
+    return el('div.banner.addon-banner', text, el('div.banner-actions', action, notNow));
   }
 
+  let toastedUpdate = null;
   function render() {
+    // The app replaced the addon it installed with its newer build: the game needs a /reload.
+    const updated = status?.addonUpdated;
+    if (updated && updated.at !== toastedUpdate && Date.now() - updated.at < 30 * 60 * 1000) {
+      toastedUpdate = updated.at;
+      toast(`Game addon updated to ${updated.version}. In game, type /reload.`);
+    }
     const kind = addonNoticeKind(status);
     // The dot only when the game was found: someone without WoW on this PC isn't nagged.
     const dot = kind === 'install' || kind === 'update';
     settingsButton.classList.toggle('has-dot', dot);
-    settingsButton.title = dot ? 'Settings · the game addon is not installed' : 'Settings';
+    settingsButton.title = !dot ? 'Settings' : kind === 'update' ? 'Settings · a newer game addon is available' : 'Settings · the game addon is not installed';
     container.replaceChildren(...(kind && dismissedIn() !== version ? [banner(kind)] : []));
   }
 

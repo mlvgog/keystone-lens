@@ -77,7 +77,7 @@ The **Keystone Lens addon** brings the Mythic+ data into the game:
 - **Item tooltips.** How many top players of your spec use an item.
 - **Your characters in the app.** The addon saves your talents and gear when you log out or `/reload`. They show up under "From the game addon" in **Compare with my character**, so you don't need to paste a SimulationCraft export.
 
-**Setting it up.** Open **⚙ Settings → Game addon**. The app finds your World of Warcraft folder, or you can choose it. Click **Install addon**, or install "Keystone Lens" from CurseForge. Every Mythic+ spec you look at is then added to the addon's data. The specs of your characters are refreshed in the background once a day. Data loads in game when you log in or `/reload`.
+**Setting it up.** Open **⚙ Settings → Game addon**. The app finds your World of Warcraft folder, or you can choose it. Click **Install addon**, or install "Keystone Lens" from CurseForge. A copy the app installed is kept up to date: when the app comes with a newer build of the addon, it replaces it, and you `/reload` in game. You can turn that off, or use **Reinstall addon** at any time. Every Mythic+ spec you look at is then added to the addon's data. The specs of your characters are refreshed in the background once a day. Data loads in game when you log in or `/reload`.
 
 The addon gets Mythic+ data only. Warcraft Logs data (damage, raid) stays in the app, as Warcraft Logs requires. More in [docs/ADDON.md](docs/ADDON.md).
 

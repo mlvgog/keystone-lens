@@ -9,6 +9,8 @@
 | App → game | One record per spec: pick rates, choice splits, popular builds (with their talents and import strings), gear, enchants and gems by game ID, stat profile, per-dungeon talents and builds | `Interface/AddOns/KeystoneLens_Data/Data.lua`, a separate addon folder the app writes, loaded at login or `/reload` |
 | Game → app | Your character as SimulationCraft-style text (talent strings, saved loadouts, equipped items), plus name, realm, region, spec and item level | `WTF/Account/<account>/SavedVariables/KeystoneLens.lua`, written by the game at logout or `/reload` |
 
+**Keeping the addon itself up to date.** The app carries the addon (`resources/addon/KeystoneLens`). Settings → Game addon installs it and writes a marker file, `.installed-by-keystone-lens`, into the copy. Each time the app starts, and each time you click Rescan, it compares that copy's files with its own (`wow.addonFingerprint`). If it carries a newer build, it replaces the copy, even when the version number is the same. Copies without the marker (installed by hand or from CurseForge) are never replaced on their own. Settings and a banner offer the update for those instead. The app never replaces a newer version than its own. **Reinstall addon** forces a fresh copy.
+
 The data folder is separate from the addon folder so that a CurseForge update of the addon never deletes the data. Its `.toc` copies the `## Interface` value of the installed addon, so the game doesn't list it as out of date.
 
 **What the app sends.** Every Mythic+ analysis you open becomes the record of its spec, replacing any older one. In the background, the app also refreshes the specs of the characters the addon saved, when their data is over a day old or misses dungeons. It does them one at a time and pauses while you run your own searches. Warcraft Logs data (Damage tab, Raid mode) is never written to disk, so it never reaches the addon.
@@ -60,7 +62,7 @@ luacheck addon/KeystoneLens --config addon/.luacheckrc
 
 The stand-in API can't prove that Blizzard's frames behave as expected. Before a release, check in game:
 
-1. **Install.** In the app, ⚙ Settings → Game addon shows your WoW folder. Install the addon, look at your spec in the app, then `/reload` in game. `/kl status` lists the spec.
+1. **Install.** In the app, ⚙ Settings → Game addon shows your WoW folder. Install the addon, look at your spec in the app, then `/reload` in game. `/kl status` lists the spec. After changing the addon in the repository, restart the app (or click Rescan). It should report "Updated by the app", and `/reload` shows the change.
 2. **Talent window** (N). Percentages appear under the nodes, with choice nodes as "60/40". There is a red frame on a popular talent you skip and an orange frame on a rare pick. The tooltip shows the Keystone Lens lines. The switch in the window's title row cycles through the dungeons, and its checkbox hides everything. With a keystone in your bags, the switch starts on its dungeon. Check that it doesn't cover anything in the title row, at the normal and the wide window size.
 3. **Hero talents.** Only the active hero tree gets numbers.
 4. **`/kl` window.**

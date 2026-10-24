@@ -398,7 +398,12 @@ export async function settingsDialog({ onChanged }) {
   const stopUpdates = window.api.onUpdateStatus(showUpdate);
   window.api.updateStatus().then((s) => updateStatus || showUpdate(s), () => {});
 
-  const addon = addonSection({ autoRefresh: settings.addonSync !== false, onAutoRefresh: (on) => save({ addonSync: on }) });
+  const addon = addonSection({
+    autoRefresh: settings.addonSync !== false,
+    onAutoRefresh: (on) => save({ addonSync: on }),
+    autoUpdate: settings.addonAutoUpdate !== false,
+    onAutoUpdate: (on) => save({ addonAutoUpdate: on }),
+  });
 
   const dev = el(
     'button.wow-btn.small',

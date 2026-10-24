@@ -1,7 +1,8 @@
 'use strict';
 
 /**
- * Keeps the game addon's data up to date:
+ * Keeps the game addon and its data up to date:
+ * - the addon copy the app installed is replaced when the app carries a newer build of it;
  * - every Mythic+ analysis you run is added to the addon's data (one record per spec);
  * - the specs of your characters (saved by the addon) are refreshed in the background when
  *   their data is over a day old, one at a time, and paused while you run your own searches;
@@ -55,7 +56,8 @@ function createAddonSync(deps) {
 
   let records = {};
   let characters = [];
-  let addon = { installed: null, bundled: null, action: null };
+  let addon = { installed: null, bundled: null, managed: false, differs: false, action: null };
+  let addonUpdated = null; // { version, at } after the app updated the addon by itself
   let syncing = null; // { specId, label } while a background refresh runs
   let lastError = null;
   let controller = null;
@@ -70,6 +72,8 @@ function createAddonSync(deps) {
       wowPath: wowPath(),
       addon,
       autoRefresh: settings.get().addonSync !== false,
+      autoUpdate: settings.get().addonAutoUpdate !== false,
+      addonUpdated,
       characters: characters.map(({ simc, ...c }) => c),
       specs: Object.values(records)
         .map((r) => ({
@@ -129,7 +133,26 @@ function createAddonSync(deps) {
     characters = retail ? await wow.readAddonCharacters(retail) : [];
   }
 
-  /** Load saved data, find the game folder if none is set, and plan the first background refresh. */
+  /**
+   * Replace the addon with the app's newer build when the app installed it (marker file) and
+   * automatic updates are on. Copies installed another way are only offered the update.
+   */
+  async function updateIfManaged() {
+    const retail = wowPath();
+    if (!retail || addon.action !== 'update' || !addon.managed || settings.get().addonAutoUpdate === false) return false;
+    try {
+      await wow.installAddon(retail, bundledAddonDir);
+      addonUpdated = { version: addon.bundled, at: Date.now() };
+      await refreshGame();
+      await writeData();
+      return true;
+    } catch (err) {
+      lastError = `Could not update the game addon: ${err.message}`;
+      return false;
+    }
+  }
+
+  /** Load saved data, find the game folder if none is set, update the addon, plan the first background refresh. */
   async function init() {
     await loadStore();
     if (!wowPath()) {
@@ -137,6 +160,7 @@ function createAddonSync(deps) {
       if (found) settings.set({ wowPath: found });
     }
     await refreshGame();
+    await updateIfManaged();
     changed();
     schedule(START_DELAY_MS);
   }
@@ -147,6 +171,7 @@ function createAddonSync(deps) {
     if (!retail) throw new Error('That is not a World of Warcraft folder. Pick the "World of Warcraft" folder or its "_retail_" folder.');
     settings.set({ wowPath: retail });
     await refreshGame();
+    await updateIfManaged();
     await writeData();
     schedule(START_DELAY_MS);
     return status();
@@ -161,9 +186,10 @@ function createAddonSync(deps) {
     return status();
   }
 
-  /** Re-read the game folder: addon version and the characters the addon saved. */
+  /** Re-read the game folder (addon version, the characters the addon saved) and update the addon. */
   async function rescan() {
     await refreshGame();
+    await updateIfManaged();
     changed();
     schedule(0);
     return status();

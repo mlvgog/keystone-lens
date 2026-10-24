@@ -408,6 +408,7 @@ ipcMain.handle('settings:set', (_e, patch) => {
   if ('updates' in patch) updater?.setMode(settings.get().updates);
   if (patch.addonSync === false) addonSync?.pause(); // stop a refresh that is running
   if (patch.addonSync === true) addonSync?.resume();
+  if (patch.addonAutoUpdate === true) addonSync?.rescan().catch(() => {}); // update now if needed
   return settings.getPublic();
 });
 

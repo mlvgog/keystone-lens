@@ -9,6 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { parseLua } = require('./lua');
 const { readTocField, MAIN_ADDON } = require('./addonExport');
@@ -21,6 +22,9 @@ const COMMON_ROOTS = [
   ...['C', 'D', 'E', 'F', 'G'].flatMap((d) => [`${d}:\\World of Warcraft`, `${d}:\\Games\\World of Warcraft`, `${d}:\\Battle.net\\World of Warcraft`]),
 ];
 const SAVED_VARIABLES = `${MAIN_ADDON}.lua`;
+// Written into the addon folder when the app installs it: copies with it are kept up to date.
+const MARKER = '.installed-by-keystone-lens';
+const TEXT_FILE = /\.(lua|toc|md|txt|xml)$/i;
 
 const exists = (p) => {
   try {
@@ -96,18 +100,64 @@ async function addonVersion(dir, name = MAIN_ADDON) {
   }
 }
 
+/** Files of an addon folder, relative and sorted; dotfiles (.pkgmeta, the marker) are left out. */
+async function addonFiles(dir, rel = '') {
+  const out = [];
+  for (const entry of await fs.promises.readdir(path.join(dir, rel), { withFileTypes: true })) {
+    if (entry.name.startsWith('.')) continue;
+    const child = rel ? `${rel}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) out.push(...(await addonFiles(dir, child)));
+    else if (entry.isFile()) out.push(child);
+  }
+  return out.sort();
+}
+
 /**
- * Installed vs bundled addon: { installed, bundled, action: 'install'|'update'|null }.
- * A newer installed copy (for example from CurseForge) is never replaced.
+ * A hash of an addon folder's files, to see whether two copies are the same build. Line endings
+ * of text files don't count (a Windows checkout and a packaged zip may differ in them).
+ * Null when the folder can't be read.
+ */
+async function addonFingerprint(dir) {
+  try {
+    const hash = crypto.createHash('sha256');
+    for (const rel of await addonFiles(dir)) {
+      let data = await fs.promises.readFile(path.join(dir, ...rel.split('/')));
+      if (TEXT_FILE.test(rel)) data = Buffer.from(data.toString('utf8').replace(/\r\n/g, '\n'));
+      hash.update(`${rel}\0`);
+      hash.update(data);
+      hash.update('\0');
+    }
+    return hash.digest('hex');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Installed vs bundled addon: { installed, bundled, managed, differs, action }.
+ * action: 'install' when missing; 'update' when the bundled copy is a newer version, or the same
+ * version with other files (a newer build); null otherwise. A newer installed version (for
+ * example from CurseForge) is never replaced. managed: the app installed this copy (marker file).
  */
 async function addonStatus(retail, bundledDir) {
-  const [installed, bundled] = await Promise.all([retail ? addonVersion(path.join(addonsDir(retail), MAIN_ADDON)) : null, addonVersion(bundledDir)]);
+  const target = retail ? path.join(addonsDir(retail), MAIN_ADDON) : null;
+  const [installed, bundled] = await Promise.all([target ? addonVersion(target) : null, addonVersion(bundledDir)]);
+  const managed = !!installed && exists(path.join(target, MARKER));
   let action = null;
+  let differs = false;
   if (retail && bundled) {
     if (!installed) action = 'install';
-    else if (compareVersions(bundled, installed) > 0) action = 'update';
+    else {
+      const order = compareVersions(bundled, installed);
+      if (order > 0) action = 'update';
+      else if (order === 0) {
+        const [a, b] = await Promise.all([addonFingerprint(bundledDir), addonFingerprint(target)]);
+        differs = !!a && !!b && a !== b;
+        if (differs) action = 'update';
+      }
+    }
   }
-  return { installed, bundled, action };
+  return { installed, bundled, managed, differs, action };
 }
 
 /**
@@ -121,6 +171,8 @@ async function installAddon(retail, bundledDir) {
   const old = `${target}.old-${stamp}`;
   await fs.promises.mkdir(addonsDir(retail), { recursive: true });
   await fs.promises.cp(bundledDir, tmp, { recursive: true });
+  const marker = { version: await addonVersion(bundledDir), fingerprint: await addonFingerprint(bundledDir), installedAt: new Date().toISOString() };
+  await fs.promises.writeFile(path.join(tmp, MARKER), `${JSON.stringify(marker, null, 2)}\n`);
   let moved = false;
   try {
     if (exists(target)) {
@@ -199,6 +251,7 @@ module.exports = {
   findWowFolder,
   addonsDir,
   addonVersion,
+  addonFingerprint,
   addonStatus,
   installAddon,
   savedVariablesFiles,

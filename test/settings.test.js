@@ -79,3 +79,14 @@ test('game folder and background refresh settings', () => {
   assert.equal(settings.get().wowPath, '');
   assert.equal(settings.get().addonSync, true);
 });
+
+test('the addon updates itself unless turned off', () => {
+  const dir = tempDir();
+  settings.init(dir, [0]);
+  assert.equal(settings.get().addonAutoUpdate, true);
+  settings.set({ addonAutoUpdate: false });
+  settings.init(dir, [0]);
+  assert.equal(settings.get().addonAutoUpdate, false);
+  settings.set({ addonAutoUpdate: 'no' });
+  assert.equal(settings.get().addonAutoUpdate, true);
+});

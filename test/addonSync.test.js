@@ -9,7 +9,11 @@ const { createAddonSync, withServerSlug, STALE_SECONDS } = require('../src/main/
 const { session: makeSession } = require('./helpers/session');
 const lua = require('./helpers/lua');
 
-function setup({ characters = [], installed = true, wowPath = true } = {}) {
+/**
+ * installed: the addon is in the game folder; managed: installed by the app (marker file);
+ * rebuilt: the app's copy has changed since (same version, another file); autoUpdate: setting.
+ */
+function setup({ characters = [], installed = true, wowPath = true, managed = false, rebuilt = false, autoUpdate = true } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kl-sync-'));
   const retail = path.join(root, 'World of Warcraft', '_retail_');
   const addons = path.join(retail, 'Interface', 'AddOns');
@@ -20,6 +24,8 @@ function setup({ characters = [], installed = true, wowPath = true } = {}) {
   fs.mkdirSync(bundled);
   fs.writeFileSync(path.join(bundled, 'KeystoneLens.toc'), '## Interface: 120007\n## Version: 1.0.0\n');
   if (installed) fs.cpSync(bundled, path.join(addons, 'KeystoneLens'), { recursive: true });
+  if (managed) fs.writeFileSync(path.join(addons, 'KeystoneLens', '.installed-by-keystone-lens'), '{}');
+  if (rebuilt) fs.writeFileSync(path.join(bundled, 'Panel.lua'), '-- the redesigned window\n');
   const chars = characters
     .map((c) => `["${c.name}-r-eu"] = { ["name"] = "${c.name}", ["realm"] = "Tarren Mill", ["region"] = "eu", ["specId"] = ${c.specId}, ["time"] = ${c.time || 1}, ["simc"] = "mage=\\"${c.name}\\"\\nserver=tarren_mill\\n" },`)
     .join('\n');
@@ -27,7 +33,7 @@ function setup({ characters = [], installed = true, wowPath = true } = {}) {
   const userData = path.join(root, 'userData');
   fs.mkdirSync(userData);
 
-  let saved = { wowPath: wowPath ? retail : '', addonSync: true };
+  let saved = { wowPath: wowPath ? retail : '', addonSync: true, addonAutoUpdate: autoUpdate };
   const settings = { get: () => saved, set: (p) => (saved = { ...saved, ...p }) };
   const calls = { analyze: [], dungeons: [], specOptions: [] };
   const timers = [];
@@ -141,4 +147,33 @@ test('characters for "compare" carry the app\'s realm slug', async () => {
   assert.match(c.simc, /^server=tarren-mill$/m);
   assert.equal('simc' in sync.status().characters[0], false, 'the status leaves the export text out');
   assert.equal(withServerSlug('mage="x"\nserver=Pozzo_dell\'Eternità\n', "Pozzo dell'Eternità"), 'mage="x"\nserver=pozzo-delleternità\n');
+});
+
+test('the addon copy the app installed is updated to the app\'s newer build on start', async () => {
+  const { sync, addons } = setup({ managed: true, rebuilt: true });
+  await sync.init();
+  assert.equal(fs.readFileSync(path.join(addons, 'KeystoneLens', 'Panel.lua'), 'utf8'), '-- the redesigned window\n');
+  const s = sync.status();
+  assert.equal(s.addon.action, null, 'up to date now');
+  assert.equal(s.addon.managed, true);
+  assert.equal(s.addonUpdated.version, '1.0.0');
+  assert.equal(fs.existsSync(path.join(addons, 'KeystoneLens_Data', 'Data.lua')), true, 'the data is written for it');
+});
+
+test('without the marker, or with automatic updates off, the update is only offered', async () => {
+  for (const options of [{ managed: false, rebuilt: true }, { managed: true, rebuilt: true, autoUpdate: false }]) {
+    const { sync, addons } = setup(options);
+    await sync.init();
+    assert.equal(fs.existsSync(path.join(addons, 'KeystoneLens', 'Panel.lua')), false, 'not replaced');
+    const s = sync.status();
+    assert.equal(s.addon.action, 'update');
+    assert.equal(s.addon.differs, true);
+    assert.equal(s.addonUpdated, null);
+
+    // The Update button installs it and marks it, so later builds update by themselves.
+    await sync.installAddon();
+    assert.equal(fs.existsSync(path.join(addons, 'KeystoneLens', 'Panel.lua')), true);
+    assert.equal(sync.status().addon.managed, true);
+    assert.equal(sync.status().addon.action, null);
+  }
 });

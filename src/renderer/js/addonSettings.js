@@ -14,19 +14,36 @@ function ago(seconds) {
 
 const regionLabel = (r) => (r === 'world' ? 'World' : String(r || '').toUpperCase());
 
+/** What the installed addon is, compared with the copy in this app: [text, css class]. */
+export function addonLineText(s) {
+  const a = s.addon || {};
+  const updated = s.addonUpdated && Date.now() - s.addonUpdated.at < 30 * 60 * 1000 ? s.addonUpdated : null;
+  if (!s.wowPath) return ['Choose the game folder to install the addon.', ''];
+  if (!a.installed) return ['Not installed. Install it here, or get "Keystone Lens" from CurseForge.', ''];
+  if (a.action === 'update' && a.differs) return [`The installed addon (${a.installed}) is an older build than this app's. Update it, then /reload in game.`, 'bad'];
+  if (a.action === 'update') return [`Version ${a.installed} installed; ${a.bundled} comes with this app. Update it, then /reload in game.`, 'bad'];
+  if (updated) return [`✔ Updated to ${updated.version} by the app. In game, type /reload.`, 'good'];
+  if (a.bundled && a.installed !== a.bundled) return [`Version ${a.installed} installed, newer than this app's ${a.bundled}. It is left alone.`, 'good'];
+  return [`✔ Version ${a.installed} installed, the same as this app's.`, 'good'];
+}
+
 /** The "Game addon" part of Settings. Returns { node, dispose }. */
-export function addonSection({ autoRefresh, onAutoRefresh }) {
+export function addonSection({ autoRefresh, onAutoRefresh, autoUpdate, onAutoUpdate }) {
   const folder = el('div.addon-folder.dim', '…');
   const chooseBtn = el('button.wow-btn.small', 'Change…');
   const addonLine = el('div.dialog-status');
   const installBtn = el('button.wow-btn.small', { hidden: true }, 'Install addon');
   const auto = el('input', { type: 'checkbox' });
   auto.checked = autoRefresh;
+  const autoUpdateBox = el('input', { type: 'checkbox' });
+  autoUpdateBox.checked = autoUpdate;
   const specList = el('div.addon-specs');
   const syncLine = el('div.dialog-status');
-  const writeBtn = el('button.wow-btn.small', { title: 'Write the data folder again, and read the characters the addon saved' }, 'Refresh');
+  const writeBtn = el('button.wow-btn.small', { title: 'Read the game folder again (addon version, your characters) and write the data for the addon' }, 'Rescan');
 
   let status = null;
+  let justInstalled = null; // version installed with the button, while Settings is open
+  let feedback = null; // what the last Rescan did
   const setLine = (node, text, cls = '') => {
     node.className = `dialog-status ${cls}`;
     node.textContent = text;
@@ -40,12 +57,12 @@ export function addonSection({ autoRefresh, onAutoRefresh }) {
     chooseBtn.textContent = s.wowPath ? 'Change…' : 'Choose…';
 
     const a = s.addon || {};
-    installBtn.hidden = !a.action;
-    installBtn.textContent = a.action === 'update' ? `Update to ${a.bundled}` : 'Install addon';
-    if (!s.wowPath) setLine(addonLine, 'Choose the game folder to install the addon.');
-    else if (!a.installed) setLine(addonLine, `Not installed. Install it here, or get "Keystone Lens" from CurseForge.`);
-    else if (a.action === 'update') setLine(addonLine, `Version ${a.installed} installed; ${a.bundled} comes with this app.`);
-    else setLine(addonLine, `✔ Version ${a.installed} installed.`, 'good');
+    // Always there once the game is found: Install, Update, or Reinstall (a fresh copy).
+    installBtn.hidden = !s.wowPath || !a.bundled;
+    installBtn.textContent = !a.installed ? 'Install addon' : a.action === 'update' ? 'Update addon' : 'Reinstall addon';
+    installBtn.title = a.installed && !a.action ? "Copy this app's addon into the game again" : '';
+    if (justInstalled && a.installed === justInstalled && !a.action) setLine(addonLine, `✔ Version ${a.installed} installed. In game, type /reload.`, 'good');
+    else setLine(addonLine, ...addonLineText(s));
 
     specList.replaceChildren(
       ...(s.specs.length
@@ -73,6 +90,7 @@ export function addonSection({ autoRefresh, onAutoRefresh }) {
     const chars = s.characters || [];
     if (s.syncing) setLine(syncLine, `Updating ${s.syncing.label}…`);
     else if (s.lastError) setLine(syncLine, s.lastError, 'bad');
+    else if (feedback) setLine(syncLine, ...feedback);
     else if (chars.length) setLine(syncLine, `Characters from the addon: ${chars.map((c) => c.name).join(', ')}.`);
     else setLine(syncLine, a.installed ? 'Log in with the addon enabled: your characters then show up here after you log out or /reload.' : '');
   }
@@ -88,14 +106,28 @@ export function addonSection({ autoRefresh, onAutoRefresh }) {
     }
   };
   chooseBtn.addEventListener('click', () => act(chooseBtn, () => window.api.addonChooseFolder()));
-  installBtn.addEventListener('click', () => act(installBtn, () => window.api.addonInstall()));
+  installBtn.addEventListener('click', () =>
+    act(installBtn, async () => {
+      const res = await window.api.addonInstall();
+      if (res.ok) justInstalled = res.status.addon.installed;
+      return res;
+    })
+  );
   writeBtn.addEventListener('click', () =>
     act(writeBtn, async () => {
       await window.api.addonRescan();
-      return window.api.addonWrite();
+      const res = await window.api.addonWrite();
+      if (res.ok && res.status) {
+        const n = res.status.specs.length;
+        feedback = res.status.addon?.installed
+          ? [`Data written for ${n} spec${n === 1 ? '' : 's'}. In game, type /reload.`, 'good']
+          : ['Install the addon first: the data is written once it is installed.', 'bad'];
+      }
+      return res;
     })
   );
   auto.addEventListener('change', () => onAutoRefresh(auto.checked));
+  autoUpdateBox.addEventListener('change', () => onAutoUpdate(autoUpdateBox.checked));
 
   const stop = window.api.onAddonStatus(render);
   window.api.addonStatus().then((s) => status || render(s), () => {});
@@ -105,6 +137,7 @@ export function addonSection({ autoRefresh, onAutoRefresh }) {
     el('div.setting-row', el('div.wow-header', 'Game addon'), writeBtn),
     el('div.setting-row', folder, chooseBtn),
     el('div.setting-row.update-row', addonLine, installBtn),
+    el('label.check-row', autoUpdateBox, el('span', 'Update the addon when this app comes with a newer one')),
     el('label.check-row', auto, el('span', "Keep my characters' specs fresh (updates their data once a day in the background)")),
     el('div.fb-label', 'Specs in the addon'),
     specList,
