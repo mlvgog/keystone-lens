@@ -9,6 +9,7 @@ import { renderPlayers } from './playersView.js';
 import { renderThroughput } from './throughputView.js';
 import { renderFilterBar } from './filterBar.js';
 import { compareDialog, settingsDialog, devDialog } from './dialogs.js';
+import { initUpdateNotice } from './updates.js';
 
 const viewEl = document.getElementById('view');
 const tabs = document.getElementById('tabs');
@@ -681,6 +682,7 @@ function applyTooltipLanguage() {
     state.settings = null;
   }
   applyTooltipLanguage();
+  initUpdateNotice(document.getElementById('update-notice'), { getMode: () => state.settings?.updates || 'auto' });
   const last = loadPrefs().last;
   if (last && last.mode !== 'raid') {
     const res = await window.api.analyzeCached(last);

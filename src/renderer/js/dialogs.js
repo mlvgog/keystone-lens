@@ -1,6 +1,7 @@
 import { el, toast } from './util.js';
 import { hideTooltip } from './tooltip.js';
 import { attachAutocomplete, matchItems, fold } from './autocomplete.js';
+import { updateStatusText, updateAction } from './updates.js';
 
 const REPO_URL = 'https://github.com/mlvgog/keystone-lens';
 
@@ -337,6 +338,33 @@ export async function settingsDialog({ onChanged }) {
     'Get a free API client'
   );
 
+  // Updates (see src/main/updater.js).
+  const updates = el(
+    'select.wow-select',
+    {},
+    [['auto', 'Automatic (recommended)'], ['notify', 'Only tell me'], ['off', 'Off']].map(([v, l]) => el('option', { value: v }, l))
+  );
+  updates.value = settings.updates || 'auto';
+  updates.addEventListener('change', () => save({ updates: updates.value }));
+  const updateLine = el('div.dialog-status');
+  const updateBtn = el('button.wow-btn.small');
+  let updateStatus = null;
+  const showUpdate = (s) => {
+    updateStatus = s;
+    updateLine.className = `dialog-status ${s?.state === 'error' ? 'bad' : s?.state === 'ready' || s?.state === 'available' ? 'good' : ''}`;
+    updateLine.textContent = updateStatusText(s);
+    const action = updateAction(s);
+    updateBtn.textContent = action ? action.label : 'Check now';
+    updateBtn.disabled = s?.state === 'disabled' || s?.state === 'checking' || s?.state === 'downloading';
+  };
+  updateBtn.addEventListener('click', () => {
+    const action = updateAction(updateStatus);
+    if (action) action.run();
+    else window.api.checkUpdate();
+  });
+  const stopUpdates = window.api.onUpdateStatus(showUpdate);
+  window.api.updateStatus().then((s) => updateStatus || showUpdate(s), () => {});
+
   const dev = el(
     'button.wow-btn.small',
     {
@@ -368,6 +396,14 @@ export async function settingsDialog({ onChanged }) {
       el('div.dialog-buttons', wclRemove, wclSave),
       el('p.faint.small', 'Stored only on this PC (the secret encrypted for your Windows account) and only sent to warcraftlogs.com. Warcraft Logs data is never saved to disk.'),
       el('div.dialog-sep'),
+      el('div.wow-header', 'Updates'),
+      el('label', 'App updates', updates),
+      el('div.setting-row.update-row', updateLine, updateBtn),
+      el(
+        'p.faint.small',
+        'New versions come from the GitHub releases of this project. Automatic downloads them in the background and installs them when you restart. Off never checks on its own.'
+      ),
+      el('div.dialog-sep'),
       el(
         'div.about',
         el('div.setting-row', el('div.wow-header', `About · Keystone Lens ${version}`), dev),
@@ -386,7 +422,7 @@ export async function settingsDialog({ onChanged }) {
         )
       )
     ),
-    { width: 540 }
+    { width: 540, onClose: stopUpdates }
   );
 }
 

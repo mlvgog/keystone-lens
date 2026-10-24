@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 22 October 2026_
+_Last updated: 24 October 2026_
 
 Keystone Lens is a desktop app that runs entirely on your PC. It has no accounts, no analytics, no telemetry and no server of its own. The developer never receives any of your data.
 
@@ -10,7 +10,7 @@ Everything is stored in `%APPDATA%\Keystone Lens`. Nothing is uploaded.
 
 | What | Where | Notes |
 |---|---|---|
-| Settings: language, default region, player count | `settings.json` | |
+| Settings: language, default region, player count, update mode | `settings.json` | |
 | Your Warcraft Logs client ID and secret (optional) | `settings.json` | The secret is encrypted with Windows' per-user encryption (DPAPI) and can't be read by other Windows accounts. |
 | Characters you load in "Compare with my character" (region, realm, name, class) | the app's local storage | Up to 12, so you can load them again with one click. |
 | SimulationCraft exports you paste | the app's local storage | Kept with the saved character so it can be loaded again without pasting. They contain your character's name, realm, talents and gear. Never sent anywhere; only the item IDs in it are looked up as described below. |
@@ -30,10 +30,13 @@ The app talks directly to these services, only to fetch the data it shows:
 | Wowhead (`www.wowhead.com`, `nether.wowhead.com`, `wow.zamimg.com`) | Item IDs for the item XML. When you hover an item or talent, Wowhead's tooltips script loads and requests that item or spell. | [Wowhead privacy policy](https://www.wowhead.com/privacy) |
 | wago.tools | Requests for public game tables (talent and item data). | [wago.tools privacy policy](https://wago.tools/privacy-policy) |
 | GitHub (`raw.githubusercontent.com`) | Downloads of SimulationCraft's public game data files. | [GitHub privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) |
+| GitHub (`github.com`, `api.github.com`, GitHub's download servers) | Update checks: a request for the newest Keystone Lens release, at start-up and every 6 hours while the app is open, and the download of a new version. Nothing about you is sent. Turn it off in ⚙ Settings → Updates. | [GitHub privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) |
 | Blizzard (`render.worldofwarcraft.com`) | Icon downloads, when raider.io's image server lacks an icon. | Blizzard's privacy policy |
 | Warcraft Logs (optional) | Your client ID and secret, to get an access token. Requests for public rankings. With "Compare with my character", the region, realm and name you enter. | [Archon (RPGLogs) privacy policy](https://archon.gg/privacy-policy) |
 
 Like any internet request, these services can see your IP address. Data requests carry a User-Agent of the form `KeystoneLens/<version> (desktop app; +https://github.com/mlvgog/keystone-lens)` so the services know which app is calling. It contains nothing about you. Icons and Wowhead's tooltips script are loaded by the app's window the way a web page loads them.
+
+A downloaded update waits in Windows' temporary folder for your user (`%LOCALAPPDATA%\keystone-lens-updater`) until it is installed.
 
 Links in the app (raider.io profiles, Warcraft Logs reports, the Armory, the GitHub page) open in your normal web browser.
 

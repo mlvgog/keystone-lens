@@ -199,6 +199,23 @@ button {
   color: #fff;
   border-color: var(--gold);
 }
+.update-notice {
+  height: 26px;
+  padding: 0 10px;
+  margin-right: 4px;
+  border-radius: 4px;
+  border: 1px solid #3f7a2c;
+  background: linear-gradient(180deg, #1f3a16, #0f1d0a);
+  color: #9dff7a;
+  font-family: var(--font-head);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.update-notice:hover {
+  color: #fff;
+  border-color: #7dff5a;
+}
 .win-btn.close {
   border-radius: 50%;
   background: radial-gradient(circle at 40% 35%, #e0442c, #8e1408 60%, #4f0703);
@@ -1911,6 +1928,10 @@ table.ov-table {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.update-row .wow-btn {
+  flex: none;
+  white-space: nowrap;
 }
 .about p {
   margin: 6px 0 0;

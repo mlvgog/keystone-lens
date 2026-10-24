@@ -19,6 +19,8 @@ Get the latest version from the [**Releases**](https://github.com/mlvgog/keyston
 | `KeystoneLens-Portable-<version>.exe` | A single exe you can run from anywhere, no install. |
 | `SHA256SUMS.txt` | Checksums to verify the download. |
 
+**Updates.** The installed app updates itself: it downloads new versions in the background and installs them when you restart or close it. The portable exe tells you when a new version is out and links to its download. You can switch this to "Only tell me" or "Off" in **⚙ Settings → Updates**. Version 1.0.0 has no updater yet, so install 1.1.0 once by hand.
+
 **Windows SmartScreen.** The exe is not code-signed yet, so Windows may show "Windows protected your PC". Click **More info → Run anyway**. Releases are built from this repository by [GitHub Actions](.github/workflows/release.yml). You can compare the file's SHA-256 (`certutil -hashfile KeystoneLens-Setup-<version>.exe SHA256`) with `SHA256SUMS.txt`, or build it yourself (see below).
 
 ## Features
@@ -72,7 +74,7 @@ Get the latest version from the [**Releases**](https://github.com/mlvgog/keyston
 
 ### Other
 
-- **Settings (⚙).** Tooltip language (9 languages), default region and player count.
+- **Settings (⚙).** Tooltip language (9 languages), default region and player count, updates (automatic, only tell me, or off).
 - **Reopen last results.** The app reopens your last results instantly.
 - **Developer menu (Ctrl+Shift+D).** Download statistics per data source.
 
@@ -128,6 +130,7 @@ Keystone Lens has no server of its own. Your PC talks to these services directly
 | [wago.tools](https://wago.tools) | Game table exports: talent positions, connections and icons, item stat allocations and bonus IDs. |
 | [Warcraft Logs](https://www.warcraftlogs.com) | Damage and healing per dungeon, and your logged runs. Optional, with your own API client. |
 | Icon servers | Icons from raider.io's image server, with Blizzard's as a fallback. |
+| [GitHub](https://github.com/mlvgog/keystone-lens/releases) | App updates: the newest release of this project. Can be turned off. |
 
 Thanks to all of them for the data that makes this possible. Please respect their terms if you build on this project.
 
@@ -171,6 +174,7 @@ Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md).
 | `src/main/aggregate.js`, `builds.js`, `gearSummary.js`, `itemInfo.js` | Talent and gear counting, build clustering, stat profile, item source parsing |
 | `src/main/throughput.js` | Damage and healing statistics |
 | `src/main/history.js`, `settings.js`, `stats.js`, `cache.js` | Trend snapshots, settings, download statistics, cache |
+| `src/main/updater.js` | App updates from GitHub Releases (electron-updater; the portable exe only links to the download) |
 | `src/main/sources/` | raider.io, Wowhead (item XML), Warcraft Logs clients; `talentTrees.js` and `itemData.js` build talent trees and item stats from SimulationCraft and wago.tools data |
 | `src/renderer/wowhead-frame.html` | Sandboxed frame for Wowhead's tooltips script (run `node scripts/update-frame-hash.js` after editing its inline script) |
 | `src/renderer/` | UI (plain HTML, CSS and ES modules) |

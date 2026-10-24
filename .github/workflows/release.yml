@@ -36,6 +36,16 @@ jobs:
           # No certificate configured yet (see docs/RELEASING.md for code signing).
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      # The installed app's updater (electron-updater) reads latest.yml from the newest release.
+      - name: Check the update files
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          test -f dist/latest.yml || { echo "dist/latest.yml is missing"; exit 1; }
+          grep -q "KeystoneLens-Setup-${version}.exe" dist/latest.yml || { echo "latest.yml does not name KeystoneLens-Setup-${version}.exe"; cat dist/latest.yml; exit 1; }
+          test -f "dist/KeystoneLens-Setup-${version}.exe.blockmap" || { echo "The installer's blockmap is missing"; exit 1; }
+          cat dist/latest.yml
+
       - name: Checksums
         shell: bash
         run: |
@@ -50,6 +60,7 @@ jobs:
           if [ -f "$notes" ]; then cp "$notes" release-notes.md; else echo "Release ${GITHUB_REF_NAME}" > release-notes.md; fi
 
       # Published right away; notes come from docs/release-notes/<tag>.md plus the commit list.
+      # latest.yml and the blockmap are for the in-app updater.
       - uses: softprops/action-gh-release@v2
         with:
           draft: false
@@ -59,3 +70,5 @@ jobs:
             dist/KeystoneLens-Setup-*.exe
             dist/KeystoneLens-Portable-*.exe
             dist/SHA256SUMS.txt
+            dist/latest.yml
+            dist/KeystoneLens-Setup-*.exe.blockmap

@@ -3,9 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULTS = { tooltipLocale: 0, defaultRegion: 'world', defaultSize: 50, wclClientId: '', wclClientSecret: '' };
+const DEFAULTS = { tooltipLocale: 0, defaultRegion: 'world', defaultSize: 50, wclClientId: '', wclClientSecret: '', updates: 'auto' };
 const REGIONS = ['world', 'us', 'eu', 'kr', 'tw'];
 const SIZES = [25, 50, 100];
+// auto: download and install updates; notify: only say a new version is out; off: never check on its own.
+const UPDATE_MODES = ['auto', 'notify', 'off'];
 
 let file = null;
 let data = { ...DEFAULTS };
@@ -50,6 +52,7 @@ function sanitize(s, validLocales) {
     defaultSize: SIZES.includes(Number(s.defaultSize)) ? Number(s.defaultSize) : DEFAULTS.defaultSize,
     wclClientId: credential(s.wclClientId),
     wclClientSecret: credential(s.wclClientSecret),
+    updates: UPDATE_MODES.includes(s.updates) ? s.updates : DEFAULTS.updates,
   };
 }
 

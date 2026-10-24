@@ -23,6 +23,8 @@ const HOST_SOURCES = {
   'wago.tools': 'wago.tools',
   'raw.githubusercontent.com': 'SimulationCraft',
   'www.warcraftlogs.com': 'Warcraft Logs',
+  // Update checks of the portable exe (the installed app's updater has its own downloader).
+  'api.github.com': 'GitHub',
   // Icons are loaded by the page itself from these CDNs.
   'cdn.raiderio.net': 'Icons (CDN)',
   'render.worldofwarcraft.com': 'Icons (CDN)',

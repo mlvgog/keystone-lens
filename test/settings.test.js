@@ -52,3 +52,16 @@ test('a secret that cannot be decrypted (other user or PC) is dropped', () => {
   assert.equal(settings.get().wclClientSecret, '');
   assert.equal(settings.get().wclClientId, 'client');
 });
+
+test('the update mode defaults to automatic and only accepts known modes', () => {
+  const dir = tempDir();
+  settings.init(dir, [0]);
+  assert.equal(settings.get().updates, 'auto');
+  settings.set({ updates: 'notify' });
+  assert.equal(settings.get().updates, 'notify');
+  settings.set({ updates: 'sometimes' });
+  assert.equal(settings.get().updates, 'auto');
+  settings.set({ updates: 'off' });
+  settings.init(dir, [0]);
+  assert.equal(settings.getPublic().updates, 'off', 'saved and visible to the window');
+});

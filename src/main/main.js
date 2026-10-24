@@ -53,6 +53,8 @@ const { importSimcCharacter } = require('./simcImport');
 const { loadRaid } = require('./raidLoader');
 const { bossDifferences } = require('./raid');
 const { characterStatProfile } = require('./gearSummary');
+const http = require('./http');
+const { createUpdater, LATEST_RELEASE_API } = require('./updater');
 
 const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
 const EXTERNAL_HOSTS = new Set([
@@ -109,6 +111,7 @@ let win = null;
 let current = null; // AbortController of the running analysis / dungeon load
 let session = null; // the analysis currently shown
 let throughputTask = null; // AbortController of the running Warcraft Logs load
+let updater = null;
 
 function createWindow() {
   win = new BrowserWindow({
@@ -395,8 +398,42 @@ ipcMain.handle('settings:get', () => ({ settings: settings.getPublic(), locales:
 ipcMain.handle('settings:set', (_e, patch) => {
   settings.set(patch, LOCALE_IDS);
   if ('wclClientId' in patch || 'wclClientSecret' in patch) wcl.forgetToken();
+  if ('updates' in patch) updater?.setMode(settings.get().updates);
   return settings.getPublic();
 });
+
+/**
+ * Updates from GitHub Releases (see updater.js). The installed app updates itself with
+ * electron-updater; the portable exe (electron-builder sets PORTABLE_EXECUTABLE_FILE) can
+ * only point to the download page. Running from source never checks.
+ */
+function initUpdater() {
+  const portable = !!process.env.PORTABLE_EXECUTABLE_FILE;
+  let autoUpdater = null;
+  if (app.isPackaged && !portable) {
+    try {
+      ({ autoUpdater } = require('electron-updater'));
+    } catch {
+      // no updater: the app works as before
+    }
+  }
+  updater = createUpdater({
+    currentVersion: app.getVersion(),
+    packaged: app.isPackaged,
+    portable,
+    autoUpdater,
+    fetchLatest: () => http.fetchJson(LATEST_RELEASE_API, { retries: 1, headers: { Accept: 'application/vnd.github+json' } }),
+    onStatus: (status) => {
+      if (win && !win.isDestroyed()) win.webContents.send('update:status', status);
+    },
+  });
+  updater.start(settings.get().updates);
+}
+
+ipcMain.handle('update:status', () => updater?.getStatus() ?? { state: 'disabled' });
+ipcMain.handle('update:check', () => updater?.check({ user: true }));
+ipcMain.handle('update:download', () => updater?.download());
+ipcMain.handle('update:install', () => updater?.install() ?? false);
 
 const MAX_LEVELS = 15;
 
@@ -575,6 +612,7 @@ app.whenReady().then(() => {
   trackIconDownloads();
   settings.init(userData, LOCALE_IDS, { vault: secretVault() });
   createWindow();
+  initUpdater();
 });
 
 app.on('window-all-closed', () => app.quit());
