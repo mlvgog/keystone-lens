@@ -1,7 +1,7 @@
 {
   "name": "keystone-lens",
   "productName": "Keystone Lens",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "See what the top Mythic+ players run: talent pick rates, popular builds, gear and damage per dungeon for every World of Warcraft spec. Data from raider.io, Wowhead and Warcraft Logs.",
   "keywords": [
     "world-of-warcraft",
