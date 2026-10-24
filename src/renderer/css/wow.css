@@ -1445,6 +1445,39 @@ table.wow-table {
   border: 1px solid #4b3c1d;
   background: linear-gradient(90deg, rgba(201, 162, 74, 0.14), rgba(0, 0, 0, 0.35));
 }
+.notices {
+  flex: 0 0 auto;
+}
+.addon-banner {
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  margin: 8px 16px 2px;
+  border-color: #8a6a2a;
+  background: linear-gradient(90deg, rgba(255, 209, 0, 0.16), rgba(0, 0, 0, 0.4));
+}
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.banner-actions .wow-btn {
+  white-space: nowrap;
+}
+.win-btn.has-dot {
+  position: relative;
+}
+.win-btn.has-dot::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffb020;
+  box-shadow: 0 0 5px #ffb020;
+}
 .banner b {
   color: #fff;
   font-weight: normal;

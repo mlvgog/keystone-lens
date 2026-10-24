@@ -246,3 +246,207 @@ function ns.NodeVerdict(stat, mine, nodeID, popular, rare)
   end
   return nil
 end
+
+-- ---------------------------------------------------------------- what is shown
+
+-- Shared by the window and the talent window, so both show the same dungeon and build.
+ns.state = {
+  zoneID = nil, -- dungeon shown (nil = all dungeons)
+  zoneChosen = false, -- picked by hand; otherwise it follows your keystone
+  compare = nil, -- { specID, zoneID, index }: build framed on the talent window
+}
+
+--- The dungeon to show for a record: the one picked by hand, else your keystone's.
+function ns:ResolveZone(rec)
+  if not self.state.zoneChosen then
+    self.state.zoneID = rec and self:CurrentDungeon(rec) or nil
+  end
+  return self.state.zoneID
+end
+
+--- Pick a dungeon by hand (nil = all dungeons). A compared build belongs to one dungeon's list,
+--- so it is cleared.
+function ns:SetZone(zoneID)
+  self.state.zoneID, self.state.zoneChosen = zoneID, true
+  self.state.compare = nil
+  self:Fire("STATE_CHANGED")
+end
+
+--- Frame the differences to one build on the talent window (nil = back to pick rates).
+function ns:SetCompare(compare)
+  self.state.compare = compare
+  if compare then
+    self.state.zoneID, self.state.zoneChosen = compare.zoneID, true
+  end
+  self:Fire("STATE_CHANGED")
+end
+
+function ns:ResetState()
+  self.state.zoneID, self.state.zoneChosen, self.state.compare = nil, false, nil
+  self:Fire("STATE_CHANGED")
+end
+
+--- The build being compared, if it belongs to this spec: build, index.
+function ns:CompareBuild(specID, rec)
+  local c = self.state.compare
+  if not c or c.specID ~= specID or not rec then
+    return nil
+  end
+  local build = ns.View(rec, c.zoneID).builds[c.index]
+  return build, c.index
+end
+
+-- ---------------------------------------------------------------- build differences
+
+local DIFF_ORDER = { add = 1, choice = 2, rank = 3, drop = 4 }
+
+--- How a build differs from yours, node by node:
+--- { { kind = "add"|"drop"|"choice"|"rank", nodeID, entryID, fromEntryID, rank, fromRank }, ... }
+--- add = the build takes it and you don't, drop = you take it and the build doesn't.
+--- With `skip` (a set of node IDs), those nodes are left out (the other hero tree's nodes).
+function ns.BuildDiff(mine, build, skip)
+  local list = {}
+  local picks = build.picks or {}
+  local choices = build.choices or {}
+  for nodeID, rank in pairs(picks) do
+    if not (skip and skip[nodeID]) then
+      local myRank = mine.picks[nodeID]
+      if not myRank then
+        list[#list + 1] = { kind = "add", nodeID = nodeID, entryID = choices[nodeID], rank = rank }
+      elseif choices[nodeID] ~= mine.choices[nodeID] then
+        list[#list + 1] = { kind = "choice", nodeID = nodeID, entryID = choices[nodeID], fromEntryID = mine.choices[nodeID] }
+      elseif myRank ~= rank then
+        list[#list + 1] = { kind = "rank", nodeID = nodeID, rank = rank, fromRank = myRank }
+      end
+    end
+  end
+  for nodeID, myRank in pairs(mine.picks) do
+    if picks[nodeID] == nil and not (skip and skip[nodeID]) then
+      list[#list + 1] = { kind = "drop", nodeID = nodeID, entryID = mine.choices[nodeID], rank = myRank }
+    end
+  end
+  table.sort(list, function(a, b)
+    if a.kind ~= b.kind then
+      return DIFF_ORDER[a.kind] < DIFF_ORDER[b.kind]
+    end
+    return a.nodeID < b.nodeID
+  end)
+  return list
+end
+
+--- The hero-tree nodes of your talent config: { [nodeID] = subTreeID }.
+function ns.HeroNodes(configID)
+  local out = {}
+  if not (C_Traits and C_ClassTalents) then
+    return out
+  end
+  configID = configID or C_ClassTalents.GetActiveConfigID()
+  local config = configID and C_Traits.GetConfigInfo(configID)
+  for _, treeID in ipairs(config and config.treeIDs or {}) do
+    for _, nodeID in ipairs(C_Traits.GetTreeNodes(treeID) or {}) do
+      local info = C_Traits.GetNodeInfo(configID, nodeID)
+      if info and info.subTreeID then
+        out[nodeID] = info.subTreeID
+      end
+    end
+  end
+  return out
+end
+
+--- Name and icon of a talent (its first entry, or `entryID` on a choice node) in your config.
+function ns.TalentEntryInfo(configID, nodeID, entryID)
+  local ok, name, icon = pcall(function()
+    configID = configID or C_ClassTalents.GetActiveConfigID()
+    if not entryID then
+      local info = C_Traits.GetNodeInfo(configID, nodeID)
+      entryID = info and info.entryIDs and info.entryIDs[1]
+    end
+    local entry = entryID and C_Traits.GetEntryInfo(configID, entryID)
+    local def = entry and entry.definitionID and C_Traits.GetDefinitionInfo(entry.definitionID)
+    if not def then
+      return nil
+    end
+    local spellID = def.overriddenSpellID or def.spellID
+    local n = (def.overrideName and def.overrideName ~= "" and def.overrideName) or (spellID and C_Spell.GetSpellName(spellID))
+    local i = def.overrideIcon or (spellID and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(spellID))
+    return n, i
+  end)
+  if ok then
+    return name, icon
+  end
+  return nil
+end
+
+-- ---------------------------------------------------------------- stats
+
+ns.STATS = {
+  { key = "crit", label = "Critical Strike", item = "ITEM_MOD_CRIT_RATING_SHORT", rating = "CR_CRIT_MELEE", id = 9 },
+  { key = "haste", label = "Haste", item = "ITEM_MOD_HASTE_RATING_SHORT", rating = "CR_HASTE_MELEE", id = 18 },
+  { key = "mastery", label = "Mastery", item = "ITEM_MOD_MASTERY_RATING_SHORT", rating = "CR_MASTERY", id = 26 },
+  { key = "vers", label = "Versatility", item = "ITEM_MOD_VERSATILITY", rating = "CR_VERSATILITY_DAMAGE_DONE", id = 29 },
+}
+
+local function itemStats(link)
+  local get = (C_Item and C_Item.GetItemStats) or GetItemStats
+  local ok, stats = pcall(get, link)
+  return ok and stats or nil
+end
+
+--- Your secondary stat ratings from gear and gems, enchants not counted (as the app counts the
+--- top players'): { crit, haste, mastery, vers }, or nil when they can't be read (in combat).
+function ns.MyGearStats()
+  if InCombatLockdown() or not ((C_Item and C_Item.GetItemStats) or GetItemStats) then
+    return nil
+  end
+  local total = { crit = 0, haste = 0, mastery = 0, vers = 0 }
+  for _, slot in ipairs(ns.SIMC_SLOTS) do
+    local link = GetInventoryItemLink("player", slot[1])
+    if link then
+      local sources = { itemStats(link) }
+      for i = 1, 4 do
+        local gemID = C_Item and C_Item.GetItemGemID and C_Item.GetItemGemID(link, i)
+        if gemID then
+          sources[#sources + 1] = itemStats("item:" .. gemID)
+        end
+      end
+      for _, stats in pairs(sources) do
+        for _, s in ipairs(ns.STATS) do
+          local v = stats[s.item] or 0
+          if issecretvalue and issecretvalue(v) then
+            return nil
+          end
+          total[s.key] = total[s.key] + v
+        end
+      end
+    end
+  end
+  return total
+end
+
+--- The stat % a rating gives at your level (mastery only for your own spec), or nil.
+function ns.StatPercent(key, rating, ownSpec)
+  if not GetCombatRatingBonusForCombatRatingValue or not rating then
+    return nil
+  end
+  for _, s in ipairs(ns.STATS) do
+    if s.key == key then
+      local ok, pct = pcall(GetCombatRatingBonusForCombatRatingValue, _G[s.rating] or s.id, rating)
+      if not ok or type(pct) ~= "number" then
+        return nil
+      end
+      if key == "mastery" then
+        if not ownSpec then
+          return nil
+        end
+        local _, coefficient = GetMasteryEffect()
+        pct = pct * (coefficient or 1)
+      end
+      return pct
+    end
+  end
+  return nil
+end
+
+ns:On("ACTIVE_PLAYER_SPECIALIZATION_CHANGED", function()
+  ns:ResetState()
+end)

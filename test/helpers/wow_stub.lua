@@ -16,6 +16,7 @@ for _, name in ipairs({
   "SetAllPoints", "SetAutoFocus", "SetBackdrop", "SetBackdropColor", "SetFocus", "SetFont", "SetFontObject",
   "SetFrameLevel", "SetFrameStrata", "SetHeight", "SetItemByID", "SetJustifyH", "SetMovable", "SetClampedToScreen",
   "SetPoint", "SetScrollChild", "SetSize", "SetTexture", "SetWidth", "StartMoving", "StopMovingOrSizing", "UnlockHighlight",
+  "SetToplevel", "SetStatusBarTexture", "SetStatusBarColor", "SetColorTexture", "SetBackdropColor", "SetJustifyV",
 }) do
   Widget[name] = noop
 end
@@ -62,10 +63,38 @@ function Widget:GetChecked() return self.checked end
 function Widget:GetFrameLevel() return 1 end
 function Widget:SetTextColor(r, g, b) self.color = { r, g, b } end
 function Widget:SetEnabled(v) self.enabled = v end
+function Widget:SetID(id) self.id = id end
+function Widget:GetID() return self.id end
+function Widget:IsMouseOver() return false end
+function Widget:GetHeight() return self.height or 500 end
+function Widget:SetMinMaxValues(lo, hi) self.min, self.max = lo, hi end
+function Widget:SetValue(v) self.value = v end
+-- PortraitFrameMixin (ButtonFrameTemplate)
+function Widget:SetTitle(t) self.title = t; table.insert(__texts, t) end
+function Widget:SetPortraitToAsset(t) self.portrait = t end
+-- DropdownButton: the menu generator is run by GenerateMenu; __menu(dd) lists its radios.
+function Widget:SetupMenu(fn) self.generator = fn; self:GenerateMenu() end
+function Widget:SetDefaultText(t) self.defaultText = t end
+function Widget:GenerateMenu()
+  local radios = {}
+  local root = {}
+  function root:CreateRadio(text, isSelected, setSelected) table.insert(radios, { text = text, isSelected = isSelected, setSelected = setSelected }) end
+  if self.generator then self.generator(self, root) end
+  self.radios = radios
+  for _, r in ipairs(radios) do
+    if r.isSelected() then self.text = r.text end
+  end
+end
 
 function CreateFrame(kind, name, parent, template)
   local w = newWidget(kind, parent)
   w.template = template
+  if template == "ButtonFrameTemplate" then
+    w.Inset = newWidget("Frame", w)
+  elseif template == "PanelTabButtonTemplate" and parent then
+    parent.Tabs = parent.Tabs or {} -- parentArray="Tabs"
+    table.insert(parent.Tabs, w)
+  end
   if kind == "Frame" or kind == "Button" or kind == "CheckButton" then
     w.shown = true
   end
@@ -201,4 +230,50 @@ C_Traits = {
   GetEntryInfo = function(_, entryID) return { definitionID = entryID } end,
   GetDefinitionInfo = function(id) return { overrideName = "Entry " .. id } end,
 }
-C_Spell = { GetSpellName = function() return nil end }
+C_Spell = { GetSpellName = function() return nil end, GetSpellTexture = function(id) return 1000 + id end }
+
+-- ---------------------------------------------------------------- window, items and stats
+
+function PanelTemplates_SetNumTabs(frame, n) frame.numTabs = n end
+function PanelTemplates_SetTab(frame, id) frame.selectedTab = id end
+function ButtonFrameTemplate_HidePortrait(frame) frame.portraitHidden = true end
+function SetItemButtonTexture(button, texture) button.texture = texture end
+function SetItemButtonQuality(button, quality) button.quality = quality end
+function BreakUpLargeNumbers(n)
+  local s = tostring(math.floor(n))
+  local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+  return (out:gsub("^,", ""))
+end
+function GetInventorySlotInfo(name) return 1, "Interface\\PaperDoll\\UI-PaperDoll-Slot-" .. name end
+-- 1% per 100 rating, mastery coefficient 2.5.
+function GetCombatRatingBonusForCombatRatingValue(_, rating) return rating / 100 end
+function GetMasteryEffect() return 20, 2.5 end
+GameFontNormalSmall = {}
+
+__itemStats = {} -- [itemID] = { ITEM_MOD_... = value }
+C_Item.GetItemStats = function(link)
+  local id = tonumber(string.match(link, "item:(%d+)"))
+  return __itemStats[id] or {}
+end
+C_Item.GetItemGemID = function(link, index)
+  local fields = {}
+  for part in (string.match(link, "item:([%-%d:]+)") .. ":"):gmatch("([^:]*):") do table.insert(fields, part) end
+  local gem = tonumber(fields[2 + index])
+  return gem and gem > 0 and gem or nil
+end
+C_Item.GetItemQualityByID = function() return 4 end
+C_Item.GetItemQualityColor = function() return 0.64, 0.21, 0.93 end
+PlayerSpellsUtil = {
+  OpenToClassTalentsTab = function()
+    if PlayerSpellsFrame and PlayerSpellsFrame.TalentsFrame then PlayerSpellsFrame.TalentsFrame:Show() end
+  end,
+}
+
+--- The radios of a dropdown: { text, selected }; __pick(dd, i) chooses one.
+function __menu(dd)
+  dd:GenerateMenu()
+  local out = {}
+  for _, r in ipairs(dd.radios) do table.insert(out, { text = r.text, selected = r.isSelected() }) end
+  return out
+end
+function __pick(dd, i) dd:GenerateMenu(); dd.radios[i].setSelected() end

@@ -2,15 +2,24 @@
 --
 -- Every visible talent node gets its pick rate underneath ("73%", or "60/40" for a choice node).
 -- A red frame marks a talent most top players take and you skip; an orange frame a talent you
--- take that few of them do. Hovering a node adds the details to its tooltip. A small bar in the
--- window's title row picks the dungeon (it starts on the dungeon of your keystone).
+-- take that few of them do. With a build chosen in the window ("Show on talents"), the frames
+-- show what to change for that build instead: green = take, red = drop, yellow = other choice
+-- or rank. Hovering a node adds the details to its tooltip. A small bar in the window's title
+-- row picks the dungeon (it starts on the dungeon of your keystone).
 local _, ns = ...
 
 local NODE_SUBTREE_SELECTION = 3 -- Enum.TraitNodeType.SubTreeSelection
 
+local COLORS = {
+  missing = { 1, 0.2, 0.1 },
+  rare = { 1, 0.55, 0 },
+  add = { 0.2, 1, 0.2 },
+  drop = { 1, 0.2, 0.1 },
+  change = { 1, 0.9, 0.1 },
+}
+
 local overlays = setmetatable({}, { __mode = "k" }) -- talent button -> our overlay frame
 local hooked = setmetatable({}, { __mode = "k" }) -- talent buttons whose tooltip we extend
-local state = { zoneID = nil, chosen = false } -- dungeon shown; chosen = picked by hand
 local bar -- the bar in the talent window's title row
 local hookedFrame -- the talent frame we hooked (nothing is written into Blizzard's frames)
 
@@ -26,6 +35,20 @@ function ns.NodeText(stat, entryIDs)
     return a .. "/" .. b
   end
   return ns.Pct(stat and stat.p or 0)
+end
+
+--- How one node compares with a build: "add", "drop", "change" or nil.
+function ns.BuildVerdict(build, mine, nodeID)
+  local theirs = build.picks and build.picks[nodeID]
+  local yours = mine and mine.picks[nodeID]
+  if theirs and not yours then
+    return "add"
+  elseif yours and not theirs then
+    return "drop"
+  elseif theirs and (theirs ~= yours or (build.choices and build.choices[nodeID]) ~= mine.choices[nodeID]) then
+    return "change"
+  end
+  return nil
 end
 
 local function textColor(p)
@@ -58,19 +81,9 @@ local function overlayFor(button)
   return o
 end
 
-local function entryName(configID, entryID)
-  local ok, name = pcall(function()
-    local entry = C_Traits.GetEntryInfo(configID, entryID)
-    local def = entry and entry.definitionID and C_Traits.GetDefinitionInfo(entry.definitionID)
-    if not def then
-      return nil
-    end
-    if def.overrideName and def.overrideName ~= "" then
-      return def.overrideName
-    end
-    return def.spellID and C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(def.spellID)
-  end)
-  return ok and name or nil
+local function talentName(nodeID, entryID)
+  local frame = talentsFrame()
+  return ns.TalentEntryInfo(frame and frame:GetConfigID(), nodeID, entryID)
 end
 
 local function addTooltip(button)
@@ -83,10 +96,9 @@ local function addTooltip(button)
   local where = view.zoneID and (ns.DungeonName(rec, view.zoneID) or "one dungeon") or "all dungeons"
   GameTooltip:AddLine(string.format("Keystone Lens · top %d %s %ss · %s", view.sample, rec.spec or "", rec.class or "", where), 1, 0.82, 0, true)
   if stat and stat.e and info and info.entryIDs and #info.entryIDs >= 2 then
-    local configID = talentsFrame() and talentsFrame():GetConfigID()
     for i = 1, 2 do
       local id = info.entryIDs[i]
-      GameTooltip:AddDoubleLine(entryName(configID, id) or (i == 1 and "Left" or "Right"), ns.Pct(stat.e[id] or 0), 1, 1, 1, 1, 1, 1)
+      GameTooltip:AddDoubleLine(talentName(o.nodeID, id) or (i == 1 and "Left" or "Right"), ns.Pct(stat.e[id] or 0), 1, 1, 1, 1, 1, 1)
     end
   else
     GameTooltip:AddLine("Picked by " .. ns.Pct(stat and stat.p or 0), 1, 1, 1)
@@ -94,10 +106,23 @@ local function addTooltip(button)
   if stat and stat.r and info and (info.maxRanks or 1) > 1 then
     GameTooltip:AddLine(string.format("Most common rank: %d/%d", stat.r, info.maxRanks), 1, 1, 1)
   end
-  if o.verdict == "missing" then
-    GameTooltip:AddLine("Most top players take this and you don't.", 1, 0.35, 0.25, true)
+  local c = o.verdict and COLORS[o.verdict]
+  if o.build then
+    local name = "Build " .. o.buildIndex
+    local theirs = o.build.picks and o.build.picks[o.nodeID]
+    local choice = o.build.choices and o.build.choices[o.nodeID]
+    if o.verdict == "add" then
+      GameTooltip:AddLine(name .. " takes this" .. (choice and (": " .. (talentName(o.nodeID, choice) or "")) or "") .. ".", c[1], c[2], c[3], true)
+    elseif o.verdict == "drop" then
+      GameTooltip:AddLine(name .. " doesn't take this.", c[1], c[2], c[3], true)
+    elseif o.verdict == "change" then
+      local text = choice and (talentName(o.nodeID, choice) or "the other choice") or ("rank " .. (theirs or 0))
+      GameTooltip:AddLine(name .. " takes " .. text .. ".", c[1], c[2], c[3], true)
+    end
+  elseif o.verdict == "missing" then
+    GameTooltip:AddLine("Most top players take this and you don't.", c[1], c[2], c[3], true)
   elseif o.verdict == "rare" then
-    GameTooltip:AddLine("Few top players take this.", 1, 0.6, 0.1, true)
+    GameTooltip:AddLine("Few top players take this.", c[1], c[2], c[3], true)
   end
   GameTooltip:Show()
 end
@@ -112,7 +137,7 @@ local function hookTooltip(button)
   end)
 end
 
-local function decorate(button, rec, view, mine)
+local function decorate(button, rec, view, mine, build, buildIndex)
   local nodeID = button.GetNodeID and button:GetNodeID()
   local info = button.GetNodeInfo and button:GetNodeInfo()
   local visible = button.ShouldBeVisible == nil or button:ShouldBeVisible()
@@ -126,15 +151,19 @@ local function decorate(button, rec, view, mine)
   local stat = view.talents[nodeID]
   o.text:SetText(ns.NodeText(stat, info and info.entryIDs))
   o.text:SetTextColor(textColor(stat and stat.p or 0))
-  o.verdict = mine and ns.NodeVerdict(stat, mine, nodeID, ns:Setting("popular"), ns:Setting("rare")) or nil
-  if o.verdict == "missing" then
-    o:SetBackdropBorderColor(1, 0.2, 0.1, 0.95)
-  elseif o.verdict == "rare" then
-    o:SetBackdropBorderColor(1, 0.55, 0, 0.95)
+  if build then
+    o.verdict = ns.BuildVerdict(build, mine, nodeID)
+  else
+    o.verdict = mine and ns.NodeVerdict(stat, mine, nodeID, ns:Setting("popular"), ns:Setting("rare")) or nil
+  end
+  local c = o.verdict and COLORS[o.verdict]
+  if c then
+    o:SetBackdropBorderColor(c[1], c[2], c[3], 0.95)
   else
     o:SetBackdropBorderColor(0, 0, 0, 0)
   end
-  o.rec, o.view, o.stat, o.info = rec, view, stat, info
+  o.rec, o.view, o.stat, o.info, o.nodeID = rec, view, stat, info, nodeID
+  o.build, o.buildIndex = build, buildIndex
   o:Show()
   hookTooltip(button)
 end
@@ -153,10 +182,11 @@ local function currentRecord(frame)
   return specID and ns:GetSpecData(specID) or nil, specID
 end
 
-local function updateBar(rec, specID)
+local function updateBar(rec, specID, buildIndex)
   if not bar then
     return
   end
+  local zoneID = ns.state.zoneID
   if not ns:Setting("overlay") then
     bar.info = "Pick rates are off."
     bar.dungeon:Hide()
@@ -165,14 +195,18 @@ local function updateBar(rec, specID)
     bar.info = "No data for " .. (name or "this spec") .. " yet. Look at it in the Keystone Lens app, then /reload."
     bar.dungeon:Hide()
   else
-    local where = state.zoneID and ns.DungeonName(rec, state.zoneID) or "All dungeons"
-    bar.dungeon:SetText(where)
+    bar.dungeon:SetText(zoneID and ns.DungeonName(rec, zoneID) or "All dungeons")
     bar.dungeon:SetShown(#ns.LoadedDungeons(rec) > 0)
     local region = rec.region == "world" and "World" or string.upper(rec.region or "")
-    bar.info = string.format("Top %d %s %ss · %s · %s", ns.View(rec, state.zoneID).sample, rec.spec or "", rec.class or "", region, ns.Ago(rec.time))
+    bar.info = string.format("Top %d %s %ss · %s · %s", ns.View(rec, zoneID).sample, rec.spec or "", rec.class or "", region, ns.Ago(rec.time))
   end
-  bar.title:SetTextColor(rec and ns:Setting("overlay") and 1 or 0.6, rec and ns:Setting("overlay") and 0.82 or 0.6, rec and ns:Setting("overlay") and 0 or 0.6)
+  local on = rec and ns:Setting("overlay")
+  bar.title:SetTextColor(on and 1 or 0.6, on and 0.82 or 0.6, on and 0 or 0.6)
   bar.toggle:SetChecked(ns:Setting("overlay"))
+  bar.compare:SetShown(buildIndex ~= nil)
+  if buildIndex then
+    bar.compare:SetText("|TInterface\\Buttons\\UI-GroupLoot-Pass-Up:14|t Build " .. buildIndex)
+  end
 end
 
 function ns:RefreshTalents()
@@ -186,15 +220,14 @@ function ns:RefreshTalents()
     updateBar(rec, specID)
     return
   end
-  if not state.chosen then
-    state.zoneID = self:CurrentDungeon(rec)
-  end
-  local view = ns.View(rec, state.zoneID)
+  local zoneID = self:ResolveZone(rec)
+  local view = ns.View(rec, zoneID)
   local mine = ns.GetMyPicks(frame.GetConfigID and frame:GetConfigID() or nil)
+  local build, buildIndex = self:CompareBuild(specID, rec)
   for button in frame:EnumerateAllTalentButtons() do
-    ns.SafeCall(decorate, button, rec, view, mine)
+    ns.SafeCall(decorate, button, rec, view, mine, build, buildIndex)
   end
-  updateBar(rec, specID)
+  updateBar(rec, specID, buildIndex)
 end
 
 local queued = false
@@ -220,21 +253,19 @@ local function cycleDungeon(step)
   local list = ns.LoadedDungeons(rec)
   local index = 0
   for i, d in ipairs(list) do
-    if d.id == state.zoneID then
+    if d.id == ns.state.zoneID then
       index = i
     end
   end
   index = (index + step) % (#list + 1)
-  state.zoneID = index > 0 and list[index].id or nil
-  state.chosen = true
-  ns:RefreshTalents()
+  ns:SetZone(index > 0 and list[index].id or nil)
 end
 
 -- The bar sits in the title row of the talent window, left of its close and maximize buttons,
 -- so it stays on screen and clear of the centred title.
 local function createBar(frame)
   bar = CreateFrame("Frame", nil, frame)
-  bar:SetSize(310, 22)
+  bar:SetSize(400, 22)
   bar:SetPoint("TOPRIGHT", PlayerSpellsFrame, "TOPRIGHT", -64, -1)
 
   bar.label = CreateFrame("Button", nil, bar)
@@ -249,6 +280,9 @@ local function createBar(frame)
     GameTooltip:Show()
   end)
   bar.label:SetScript("OnLeave", GameTooltip_Hide)
+  bar.label:SetScript("OnClick", function()
+    ns:Fire("TOGGLE_PANEL")
+  end)
 
   bar.toggle = CreateFrame("CheckButton", nil, bar, "UICheckButtonTemplate")
   bar.toggle:SetSize(22, 22)
@@ -278,10 +312,26 @@ local function createBar(frame)
   end)
   bar.dungeon:SetScript("OnLeave", GameTooltip_Hide)
 
-  -- Right to left: dungeon button, checkbox, label.
+  -- Shown while a build from the window is framed on the tree; a click goes back to pick rates.
+  bar.compare = CreateFrame("Button", nil, bar, "UIPanelButtonTemplate")
+  bar.compare:SetSize(84, 20)
+  bar.compare:Hide()
+  bar.compare:SetScript("OnClick", function()
+    ns:SetCompare(nil)
+  end)
+  bar.compare:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:AddLine("Showing what to change for this build")
+    GameTooltip:AddLine("Green: take · Red: drop · Yellow: other choice or rank. Click to go back to pick rates.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  bar.compare:SetScript("OnLeave", GameTooltip_Hide)
+
+  -- Right to left: dungeon button, checkbox, label, then the build being compared.
   bar.dungeon:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
   bar.toggle:SetPoint("RIGHT", bar.dungeon, "LEFT", -4, 0)
   bar.label:SetPoint("RIGHT", bar.toggle, "LEFT", -2, 0)
+  bar.compare:SetPoint("RIGHT", bar.label, "LEFT", -6, 0)
 end
 
 local function setup()
@@ -291,16 +341,27 @@ local function setup()
   end
   hookedFrame = frame
   createBar(frame)
-  frame:HookScript("OnShow", function()
-    if not state.chosen then
-      state.zoneID = nil
-    end
-    refreshSoon()
-  end)
+  frame:HookScript("OnShow", refreshSoon)
   if frame.UpdateTreeInfo then
     hooksecurefunc(frame, "UpdateTreeInfo", refreshSoon)
   end
   refreshSoon()
+end
+
+--- Open the talent window (out of combat) so a compared build can be seen; true when it is open.
+--- Only when the game has loaded the talent UI already: loading Blizzard's UI from an addon can
+--- break it ("action blocked"), so otherwise the player opens it (N).
+function ns.OpenTalents()
+  local frame = talentsFrame()
+  if frame and frame:IsShown() then
+    return true
+  end
+  if not frame or InCombatLockdown() or not (PlayerSpellsUtil and PlayerSpellsUtil.OpenToClassTalentsTab) then
+    return false
+  end
+  pcall(PlayerSpellsUtil.OpenToClassTalentsTab)
+  frame = talentsFrame()
+  return frame and frame:IsShown() or false
 end
 
 if EventUtil and EventUtil.ContinueOnAddOnLoaded then
@@ -314,8 +375,5 @@ else
 end
 
 ns:On("TRAIT_CONFIG_UPDATED", refreshSoon)
-ns:On("ACTIVE_PLAYER_SPECIALIZATION_CHANGED", function()
-  state.zoneID, state.chosen = nil, false
-  refreshSoon()
-end)
+ns:Listen("STATE_CHANGED", refreshSoon)
 ns:Listen("SETTING_CHANGED", refreshSoon)

@@ -35,6 +35,11 @@ test('a spec record holds pick rates, builds, gear, enchants and gems', async ()
   assert.equal(r.gear.head[0].tier, true);
   assert.deepEqual(r.enchants.rings, [{ id: 7001, name: 'Radiant Crit', n: 4 }, { id: 7002, name: 'Radiant Haste', n: 2 }]);
   assert.deepEqual(r.gems, [{ id: 9001, name: 'Masterful Ruby', n: 8 }, { id: 9002, name: 'Quick Onyx', n: 4 }]);
+  assert.equal(r.gemSockets, 12);
+
+  // Stats: average rating from gear (4 players with gear A, 2 with gear B) and each stat's share.
+  assert.deepEqual(r.statRatings, { crit: 967, haste: 1233, mastery: 433, vers: 133 });
+  assert.equal(r.stats.haste, 0.445, 'the average of each player\'s share');
 
   // Dungeons: the list (with keystone map IDs) and per-dungeon data for loaded ones only.
   assert.deepEqual(r.dungeonList, [{ id: 9, name: 'Somewhere', short: 'SW', map: 501 }, { id: 10, name: 'Elsewhere', short: 'EW', map: undefined }]);

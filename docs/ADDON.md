@@ -23,8 +23,10 @@ The data folder is separate from the addon folder so that a CurseForge update of
 | `Core.lua` | Namespace, settings, events, `/kl` |
 | `Data.lua` | Data lookup (newest record per spec), dungeon of your keystone, your talents, build distance |
 | `Character.lua` | Saves your character for the app (SimulationCraft format, read by `src/main/simc.js`) |
-| `Talents.lua` | Pick rates and frames on Blizzard's talent window, and the dungeon switch in its title row |
-| `Panel.lua` | The `/kl` window: Builds, Gear, About |
+| `Talents.lua` | Pick rates and frames on Blizzard's talent window (or a compared build's changes), and the switch in its title row |
+| `Gear.lua` | The Overview tab: character pane with the top players' gear, slot flyouts, stat bars |
+| `Builds.lua` | The side pane with the popular builds, their differences from yours, Copy and Show on talents |
+| `Panel.lua` | The `/kl` window: spec and dungeon menus, Overview and Info tabs, the copy box |
 | `Tooltips.lua` | The popularity line on item tooltips |
 | `Options.lua` | The page in the game's Settings → AddOns |
 
@@ -61,10 +63,22 @@ The stand-in API can't prove that Blizzard's frames behave as expected. Before a
 1. **Install.** In the app, ⚙ Settings → Game addon shows your WoW folder. Install the addon, look at your spec in the app, then `/reload` in game. `/kl status` lists the spec.
 2. **Talent window** (N). Percentages appear under the nodes, with choice nodes as "60/40". There is a red frame on a popular talent you skip and an orange frame on a rare pick. The tooltip shows the Keystone Lens lines. The switch in the window's title row cycles through the dungeons, and its checkbox hides everything. With a keystone in your bags, the switch starts on its dungeon. Check that it doesn't cover anything in the title row, at the normal and the wide window size.
 3. **Hero talents.** Only the active hero tree gets numbers.
-4. **`/kl` window.** The Builds tab names your closest build, and Copy shows the string, which imports through Loadouts → Import. The Gear tab marks your equipped items and enchants, with item tooltips on hover. The About tab is filled in.
-5. **Item tooltips.** Hovering a popular trinket shows "Keystone Lens: 42% of the top 50 …".
-6. **Back to the app.** Log out or `/reload`, then open Compare with my character in the app. The character is listed under "From the game addon" and loads.
-7. **Errors.** Use `/console scriptErrors 1`, or BugSack, and expect no Lua errors, also in combat and in a key.
+4. **`/kl` window.**
+   - It looks like a game window (portrait, title, tabs under it), is opaque, can be moved, and closes with Escape.
+   - Every slot shows an icon with a quality border and a %. Empty slots show the slot art. Your items have a tick.
+   - Clicking a slot opens its flyout next to it, with options, enchants and your items highlighted. A click elsewhere closes it.
+   - The stat bars show sensible ratings and percentages for both sides. Compare yours with the character sheet: these leave out enchants.
+   - The spec menu appears with two or more specs. The dungeon menu changes the builds and the talent window together.
+   - The Info tab is filled in, and its checkboxes work.
+5. **Build pane.**
+   - The pane sits against the right of the window and can be closed and reopened (Builds).
+   - The card closest to yours is open and ticked. Other cards list the talents to take, drop or change, with icons.
+   - Copy shows the string, which imports through Loadouts → Import.
+   - **Show on talents** opens the talent window if the game has loaded it this session (otherwise it asks you to press N). It frames take (green), drop (red) and change (yellow). The "Build N" button in the window's title row goes back to pick rates.
+   - **After using it, apply a talent change: there must be no "Interface action failed because of an AddOn".**
+6. **Item tooltips.** Hovering a popular trinket shows "Keystone Lens: 42% of the top 50 …".
+7. **Back to the app.** Log out or `/reload`, then open Compare with my character in the app. The character is listed under "From the game addon" and loads.
+8. **Errors.** Use `/console scriptErrors 1`, or BugSack, and expect no Lua errors, also in combat and in a key.
 
 ## Publishing on CurseForge
 

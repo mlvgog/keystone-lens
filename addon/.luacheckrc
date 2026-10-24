@@ -22,6 +22,9 @@ read_globals = {
   "GetSpecializationInfo", "GetSpecializationInfoByID", "InCombatLockdown", "ItemRefTooltip", "PlayerSpellsFrame",
   "PlayerUtil", "Settings", "TooltipDataProcessor", "UIParent", "UISpecialFrames", "UnitClass", "UnitLevel",
   "UnitName", "UnitRace", "date", "geterrorhandler", "hooksecurefunc", "issecretvalue", "strtrim", "time",
-  "tinsert", "GameFontHighlightSmall", "GameFontNormal",
+  "tinsert", "GameFontHighlightSmall", "GameFontNormal", "GameFontNormalSmall",
+  "BreakUpLargeNumbers", "ButtonFrameTemplate_HidePortrait", "GetCombatRatingBonusForCombatRatingValue",
+  "GetInventorySlotInfo", "GetItemStats", "GetMasteryEffect", "PanelTemplates_SetNumTabs", "PanelTemplates_SetTab",
+  "PlayerSpellsUtil", "SetItemButtonQuality", "SetItemButtonTexture",
   "KeystoneLensAppData", "KeystoneLensBundledData",
 }

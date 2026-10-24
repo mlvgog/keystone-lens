@@ -11,8 +11,9 @@
  *   talents: { [nodeId]: { p, e: { [entryId]: share } (choice nodes), r: common rank (multi-rank) } },
  *   builds: [{ n, p, hero, str, picks: { [nodeId]: rank }, choices: { [nodeId]: entryId } }],
  *   gear: { [slotGroup]: [{ id, name, n, ilvl, tier }] },
- *   enchants: { [slotGroup]: [{ id, name, n }] }, gems: [{ id, name, n }],
- *   embellishments: [{ id, name, n }], stats: { crit, haste, mastery, vers },
+ *   enchants: { [slotGroup]: [{ id, name, n }] }, gems: [{ id, name, n }], gemSockets (gems socketed in all),
+ *   embellishments: [{ id, name, n }], stats: { crit, haste, mastery, vers } (share of their secondary stats),
+ *   statRatings: { crit, haste, mastery, vers } (average rating from gear and gems, enchants not counted),
  *   dungeonList: [{ id, name, short, map }],
  *   dungeons: { [zoneId]: { sample, hero, talents, builds } } }
  */
@@ -134,11 +135,13 @@ function enchantsAndGems(players) {
     if (counts.size) enchants[g.key] = topById(counts, TOP_ENCHANTS);
   }
   const gems = new Map();
+  let sockets = 0;
   for (const items of players) {
     for (const g of SLOT_GROUPS) {
       for (const slot of g.slots) {
         for (const gem of items[slot]?.gems || []) {
           if (!gem.id) continue;
+          sockets++;
           const entry = gems.get(gem.id) || { id: gem.id, name: stripEscapes(gem.name) || undefined, n: 0 };
           entry.n++;
           gems.set(gem.id, entry);
@@ -146,7 +149,7 @@ function enchantsAndGems(players) {
       }
     }
   }
-  return { enchants, gems: topById(gems, TOP_GEMS) };
+  return { enchants, gems: topById(gems, TOP_GEMS), gemSockets: sockets };
 }
 
 function statsRecord(profile) {
@@ -154,12 +157,17 @@ function statsRecord(profile) {
   return Object.fromEntries(profile.stats.map((s) => [s.key, round(s.share)]));
 }
 
+function statRatingsRecord(profile) {
+  if (!profile) return undefined;
+  return Object.fromEntries(profile.stats.map((s) => [s.key, Math.round(s.avg)]));
+}
+
 /** The record of one analysed spec (Mythic+ sessions only). */
 async function specRecord(session) {
   const { meta, tree } = session;
   if (meta.mode === 'raid') throw new Error('Raid data (Warcraft Logs) is not exported to the addon.');
   const view = await buildView(session, {}, {});
-  const { enchants, gems } = enchantsAndGems(samplePlayers(session, null).map((x) => x.d.items || {}));
+  const { enchants, gems, gemSockets } = enchantsAndGems(samplePlayers(session, null).map((x) => x.d.items || {}));
   const record = {
     specId: meta.specId,
     class: meta.className,
@@ -178,8 +186,10 @@ async function specRecord(session) {
     gear: gearRecord(view.gear),
     enchants,
     gems,
+    gemSockets: gemSockets || undefined,
     embellishments: view.gearSummary.embellishments.items.slice(0, TOP_GEMS).map((e) => ({ id: e.id, name: e.name || undefined, n: e.count })),
     stats: statsRecord(view.statProfile),
+    statRatings: statRatingsRecord(view.statProfile),
     dungeonList: meta.dungeons.map((d) => ({ id: d.id, name: d.name, short: d.shortName || undefined, map: d.challengeModeId || undefined })),
     dungeons: {},
   };

@@ -73,7 +73,7 @@ Get the latest version from the [**Releases**](https://github.com/mlvgog/keyston
 The **Keystone Lens addon** brings the Mythic+ data into the game:
 
 - **Talent window.** The pick rate of every talent appears under it, with choice splits on choice nodes. A red frame marks a popular talent you skip, and an orange frame a rare one you take. A switch in the window's title row changes between all dungeons and each dungeon. It starts on the dungeon of your keystone.
-- **Builds and gear (`/kl`).** The popular builds per dungeon, with the one closest to yours and their import strings. The most used items per slot, with your own marked, plus enchants, gems, embellishments, and their secondary stats next to yours.
+- **The `/kl` window.** The top players' gear as a character pane: each slot shows the most used item with its %, with a tick when you wear it. Click a slot for every option, its enchants, and the gems. In the middle are bars for their secondary stats next to yours, as rating and %. A side pane lists the popular builds per dungeon. Each build shows the talents it changes compared with yours, a Copy button for its string, and **Show on talents**, which frames those changes on your talent window.
 - **Item tooltips.** How many top players of your spec use an item.
 - **Your characters in the app.** The addon saves your talents and gear when you log out or `/reload`. They show up under "From the game addon" in **Compare with my character**, so you don't need to paste a SimulationCraft export.
 

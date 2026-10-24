@@ -17,5 +17,7 @@ Data.lua
 Character.lua
 Tooltips.lua
 Talents.lua
+Gear.lua
+Builds.lua
 Panel.lua
 Options.lua

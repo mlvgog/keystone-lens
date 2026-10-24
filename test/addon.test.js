@@ -220,40 +220,175 @@ test('the talent window shows pick rates and frames the differences', async () =
   assert.ok(lines.includes('Entry 22 33%'));
 
   // The dungeon button switches to that dungeon's data; turning the overlay off hides it.
-  addon.run(L, 'PlayerSpellsFrame.TalentsFrame.children[1].children[3].scripts.OnClick(nil, "LeftButton")');
+  addon.run(L, 'PlayerSpellsFrame.TalentsFrame.children[1].children[3].scripts.OnClick(nil, "LeftButton"); __runTimers()');
   assert.equal(addon.evaluate(L, '__overlay(2)'), '33/67', 'in dungeon 9, two of three players take the right side');
   addon.run(L, '__ns:SetSetting("overlay", false); __runTimers()');
   assert.equal(addon.evaluate(L, '__overlay(1)'), null);
   assert.deepEqual(addon.errors(L), []);
 });
 
-test('the window lists builds and gear, or explains where data comes from', async () => {
-  const L = addon.loadAddon({ before: [await appData({ stats: { crit: 0.3, haste: 0.4, mastery: 0.2, vers: 0.1 } })] });
+// Your gear for the window tests: the most used head, the most used ring (enchanted, with the
+// most used gem) and nothing in the hands slot.
+const MY_GEAR = `
+__player.items[1] = "|cffa335ee|Hitem:100::::::::90:64::::0:0|h[Head]|h|r"
+__player.items[11] = "|cffa335ee|Hitem:400:7001:9001:::::::90:64::::0:0|h[Ring]|h|r"
+__itemStats[100] = { ITEM_MOD_CRIT_RATING_SHORT = 400, ITEM_MOD_HASTE_RATING_SHORT = 200 }
+__itemStats[400] = { ITEM_MOD_HASTE_RATING_SHORT = 500 }
+__itemStats[9001] = { ITEM_MOD_MASTERY_RATING_SHORT = 50 }`;
+
+async function openWindow(extra = []) {
+  const L = addon.loadAddon({ before: [await appData(), ...extra] });
   addon.run(L, MY_NODES);
-  addon.run(L, '__ns:TogglePanel()');
-  let texts = addon.evaluate(L, '__texts');
-  assert.ok(texts.includes('Top 6 Frost Mages · World'));
-  assert.ok(texts.some((t) => /Your build is Build 1\./.test(t)));
-  assert.ok(texts.some((t) => /Build 1 · Alpha · 4 players \(67%\)/.test(t)));
-  assert.ok(texts.some((t) => /Build 2 · Beta · 2 players \(33%\)/.test(t)));
+  addon.run(L, MY_GEAR);
+  addon.run(L, '__ns:TogglePanel(); __runTimers()');
+  return L;
+}
 
-  addon.run(L, '__texts = {}; KeystoneLensFrame.tabs.gear.scripts.OnClick()');
-  texts = addon.evaluate(L, '__texts');
-  assert.ok(texts.includes('Rings'));
-  assert.ok(texts.some((t) => /^Their stats: Critical Strike/.test(t)));
-  assert.ok(texts.some((t) => /^Yours: Critical Strike 30%/.test(t)));
-  assert.ok(texts.some((t) => /Enchant: .*Radiant Crit 67%/.test(t)));
+test('the overview shows the top players\' gear as a character pane', async () => {
+  const L = await openWindow();
+  const slot = (i, field) => addon.evaluate(L, `KeystoneLensFrame.overview.slots[${i}].${field}`);
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.title'), 'Keystone Lens · Frost Mage');
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.overview.header.text'), 'Top 6 Frost Mages');
 
-  addon.run(L, '__texts = {}; KeystoneLensFrame.tabs.about.scripts.OnClick()');
-  texts = addon.evaluate(L, '__texts');
-  assert.ok(texts.some((t) => /desktop app/.test(t)));
-  assert.ok(texts.some((t) => /raider\.io/.test(t)), 'credits the data source');
+  // Slots 1-8 left (head ... gems, embellished), 9-16 right (hands ... trinkets), 17-18 weapons.
+  assert.equal(slot(1, 'itemID'), 100);
+  assert.equal(slot(1, 'pct.text'), '67%');
+  assert.equal(slot(1, 'tick.shown'), true, 'you wear the most used head');
+  assert.equal(slot(1, 'quality'), 4);
+  assert.equal(slot(9, 'itemID'), null, 'nobody has hands data');
+  assert.equal(slot(9, 'texture'), 'Interface\\PaperDoll\\UI-PaperDoll-Slot-HANDSSLOT', 'empty-slot art');
+  assert.equal(slot(13, 'itemID'), 400, 'first ring slot: the most used ring');
+  assert.equal(slot(14, 'itemID'), 401, 'second ring slot: the next one');
+  assert.equal(slot(14, 'tick.shown'), false);
+  assert.equal(slot(7, 'itemID'), 9001, 'gems');
+  assert.equal(slot(7, 'pct.text'), '67%', 'of all gem sockets');
+  assert.equal(slot(7, 'tick.shown'), true);
+  assert.equal(slot(17, 'itemID'), 200, 'main hand');
+
+  // The flyout of a ring slot: every ring, then the enchants; yours marked.
+  const lines = addon.evaluate(L, '__ns.FillFlyout(KeystoneLensFrame.overview.slots[13], __ns:GetSpecData(64), __ns.MyGear())');
+  assert.deepEqual(
+    lines.map((l) => [l.header || l.text, l.right || null, !!l.mine]),
+    [
+      ['Item 400', '100%', true],
+      ['Item 401', '67%', false],
+      ['Item 402', '33%', false],
+      ['Enchants', null, false],
+      ['Radiant Crit', '67%', true],
+      ['Radiant Haste', '33%', false],
+    ]
+  );
+  addon.run(L, 'KeystoneLensFrame.overview.slots[13].scripts.OnClick(KeystoneLensFrame.overview.slots[13])');
+
+  // Stat bars: their average rating and yours (gear and gems), with the % that rating gives.
+  const rows = addon.evaluate(L, '__ns.StatRows(__ns:GetSpecData(64), __ns.MyGearStats(), true)');
+  assert.deepEqual(rows.crit, { theirs: 967, theirsPct: 9.67, yours: 400, yoursPct: 4, share: 0.349 });
+  assert.equal(rows.haste.yours, 700);
+  assert.equal(rows.mastery.yours, 50, 'gem stats count');
+  assert.equal(rows.mastery.yoursPct, 1.25, 'mastery uses your spec\'s coefficient');
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.overview.stats.rows[1].theirs.text.text'), '967 · 9.7%');
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.overview.stats.rows[2].yours.text.text'), '700 · 7.0%');
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.overview.hero.text'), 'Hero talents: Alpha 67% · Beta 33%');
+  assert.match(addon.evaluate(L, 'KeystoneLensFrame.overview.build.text.text'), /Your talents are Build 1\./);
+  assert.deepEqual(addon.errors(L), []);
+});
+
+test('the build pane lists the builds and what each changes in yours', async () => {
+  const L = await openWindow();
+  const card = (i, field) => addon.evaluate(L, `KeystoneLensBuildsFrame.cards[${i}].${field}`);
+  assert.equal(card(1, 'title.text'), '|TInterface\\RaidFrame\\ReadyCheck-Ready:12|t Build 1 · Alpha');
+  assert.equal(card(1, 'sub.text'), '4 players · 67% · |cff40ff40your build|r');
+  assert.equal(card(2, 'title.text'), 'Build 2 · Beta');
+  assert.equal(card(2, 'sub.text'), '2 players · 33% · 5 talents differ');
+  assert.equal(card(1, 'lines[1].text'), '|cff40ff40This is your build.|r', 'your closest build is open');
+
+  // Opening build 2: the other hero tree in one line, then take / other choice / other rank.
+  addon.run(L, 'KeystoneLensBuildsFrame.cards[2].scripts.OnClick(KeystoneLensBuildsFrame.cards[2])');
+  const lines = [1, 2, 3, 4].map((i) => card(2, `lines[${i}].text`));
+  assert.deepEqual(lines, [
+    'Hero talents: |cffffd100Beta|r (yours: Alpha)',
+    '|cff40ff40+|r Entry 60',
+    '|cffffd100~|r Entry 22  |cff999999instead of Entry 21|r',
+    '|cffffd100~|r Entry 30  |cff999999rank 1 instead of 2|r',
+  ]);
+  assert.equal(card(2, 'copy.shown'), true);
+
+  // Show on talents: the talent window frames what build 2 changes, until you stop it.
+  addon.run(L, TALENT_FRAME);
+  addon.run(L, 'PlayerSpellsFrame.TalentsFrame:Hide(); KeystoneLensBuildsFrame.cards[2].show.scripts.OnClick(); __runTimers()');
+  assert.equal(addon.evaluate(L, 'PlayerSpellsFrame.TalentsFrame:IsShown()'), true, 'the talent window opens');
+  assert.deepEqual(addon.evaluate(L, '__border(6)'), [0.2, 1, 0.2, 0.95], 'build 2 takes it: green');
+  assert.deepEqual(addon.evaluate(L, '__border(2)'), [1, 0.9, 0.1, 0.95], 'other choice: yellow');
+  assert.deepEqual(addon.evaluate(L, '__border(3)'), [1, 0.9, 0.1, 0.95], 'other rank: yellow');
+  assert.deepEqual(addon.evaluate(L, '__border(4)'), [1, 0.2, 0.1, 0.95], 'your hero tree, which build 2 does not use: red');
+  assert.equal(addon.evaluate(L, '__border(1)[4]'), 0, 'the same in both');
+  const bar = 'PlayerSpellsFrame.TalentsFrame.children[1].children[4]';
+  assert.equal(addon.evaluate(L, `${bar}.shown`), true);
+  assert.match(addon.evaluate(L, `${bar}.text`), /Build 2$/);
+  addon.run(L, `GameTooltip:SetOwner(__buttons[6]); __buttons[6]:SetTooltipInternal()`);
+  assert.ok(addon.evaluate(L, 'GameTooltip.lines').includes('Build 2 takes this.'));
+
+  addon.run(L, `${bar}.scripts.OnClick(); __runTimers()`);
+  assert.equal(addon.evaluate(L, `${bar}.shown`), false);
+  assert.equal(addon.evaluate(L, '__border(6)[4]'), 0, 'back to pick rates');
+  assert.deepEqual(addon.errors(L), []);
+});
+
+test('build differences, kind by kind', () => {
+  const L = addon.loadAddon();
+  const diff = addon.evaluate(
+    L,
+    `__ns.BuildDiff(
+      { picks = { [1] = 1, [2] = 1, [3] = 2, [7] = 1 }, choices = { [2] = 21 } },
+      { picks = { [1] = 1, [2] = 1, [3] = 1, [6] = 1, [8] = 1 }, choices = { [2] = 22 } },
+      { [8] = 40 })`
+  );
+  assert.deepEqual(
+    diff.map((d) => [d.kind, d.nodeID]),
+    [['add', 6], ['choice', 2], ['rank', 3], ['drop', 7]],
+    'node 8 is skipped (the other hero tree)'
+  );
+  assert.equal(addon.evaluate(L, '__ns.BuildDistance({ picks = { [1] = 1 }, choices = {} }, { picks = { [1] = 2, [2] = 1 } })'), 2);
+});
+
+test('the dropdowns change the spec and the dungeon, shared with the talent window', async () => {
+  const fire = dataFileText({ 63: { ...(await specRecord(session())), specId: 63, spec: 'Fire' } }).replace('KeystoneLensAppData = ', 'KeystoneLensBundledData = ');
+  const L = await openWindow([fire]);
+  const spec = 'KeystoneLensFrame.specMenu';
+  const zone = 'KeystoneLensFrame.zoneMenu';
+  assert.equal(addon.evaluate(L, `${spec}.shown`), true, 'two specs: the spec menu shows');
+  assert.deepEqual(addon.evaluate(L, `__menu(${spec})`), [{ text: 'Fire Mage', selected: false }, { text: 'Frost Mage', selected: true }]);
+  assert.deepEqual(addon.evaluate(L, `__menu(${zone})`), [{ text: 'All dungeons', selected: true }, { text: 'Somewhere', selected: false }]);
+
+  addon.run(L, `__pick(${zone}, 2); __runTimers()`);
+  assert.equal(addon.evaluate(L, '__ns.state.zoneID'), 9);
+  assert.equal(addon.evaluate(L, 'KeystoneLensBuildsFrame.where.text'), 'Somewhere · top 3');
+
+  addon.run(L, `__pick(${spec}, 1); __runTimers()`);
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.title'), 'Keystone Lens · Fire Mage');
+  assert.equal(addon.evaluate(L, '__ns.state.zoneID'), null, 'a new spec starts on all dungeons');
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.overview.slots[1].tick.shown'), true, 'your gear is still marked: same class');
+  assert.deepEqual(addon.errors(L), []);
+});
+
+test('the Info tab says where the data comes from; without data the window explains it', async () => {
+  const L = await openWindow();
+  // The Info tab's fixed text is written when the window is built.
+  const fixed = addon.evaluate(L, '__texts');
+  assert.ok(fixed.some((t) => /desktop app/.test(t)));
+  assert.ok(fixed.some((t) => /raider\.io/.test(t)), 'credits the data source');
+  addon.run(L, '__texts = {}; KeystoneLensFrame.tabs[2].scripts.OnClick()');
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.selectedTab'), 2);
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.overview.shown'), false);
+  const texts = addon.evaluate(L, '__texts');
+  assert.ok(texts.includes('Top 6 Frost Mages · World · MN Season 1 · patch 12.1.0'));
+  assert.ok(texts.some((t) => /^From the Keystone Lens app, .*1 of 2 dungeons have their own builds\.$/.test(t)));
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.info.checks[1].checked'), true);
 
   const empty = addon.loadAddon();
   addon.run(empty, '__ns:TogglePanel()');
-  texts = addon.evaluate(empty, '__texts');
-  assert.ok(texts.includes('No data yet'));
-  assert.ok(texts.some((t) => /Keystone Lens desktop app/.test(t)));
+  assert.match(addon.evaluate(empty, 'KeystoneLensFrame.overview.empty.text'), /^No data yet\.[\s\S]*Keystone Lens desktop app/);
+  assert.equal(addon.evaluate(empty, 'KeystoneLensFrame.overview.slots[1].shown'), false);
   assert.deepEqual(addon.errors(L), []);
   assert.deepEqual(addon.errors(empty), []);
 });

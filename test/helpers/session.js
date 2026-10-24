@@ -94,7 +94,15 @@ function session() {
     tree,
     players,
     dungeonsLoaded: [9],
-    itemInfo: {},
+    // Secondary stats per item variant ("id|bonuses|ilvl"), for the stat profile.
+    itemInfo: {
+      '100||334': { stats: { crit: 400, haste: 200, mastery: 0, vers: 0 } },
+      '101||330': { stats: { crit: 300, haste: 0, mastery: 300, vers: 0 } },
+      '400||330': { stats: { crit: 0, haste: 500, mastery: 0, vers: 0 } },
+      '401||330': { stats: { crit: 0, haste: 0, mastery: 500, vers: 0 } },
+      '402||326': { stats: { crit: 0, haste: 0, mastery: 0, vers: 400 } },
+      '200||334': { stats: { crit: 600, haste: 600, mastery: 0, vers: 0 } },
+    },
     itemSources: {},
   };
 }
