@@ -39,6 +39,7 @@ const TTL = {
   itemBonus: 7 * DAY,
   enchantName: 7 * DAY,
   gameTables: DAY,
+  racials: DAY,
   analysis: HOUR,
 };
 

@@ -25,13 +25,15 @@ export function searchLabel(r) {
  * recent search is clicked.
  * `prefs` = last used choices ({ mode, classSlug, specId, region, sampleSize, since, difficulty }),
  * `recents` = recent searches (full opts), `defaults` = { region, sampleSize } from settings,
+ * `wclEnabled` = the Warcraft Logs features are on in Settings (without them there is no Raid mode),
  * `hasWcl` = a Warcraft Logs client is set up (raid mode needs it), `onSettings` opens Settings.
  */
-export function renderSpecPicker(container, classes, prefs, onStart, { recents = [], defaults = {}, hasWcl = false, onSettings } = {}) {
+export function renderSpecPicker(container, classes, prefs, onStart, { recents = [], defaults = {}, wclEnabled = false, hasWcl = false, onSettings } = {}) {
   clear(container);
   let selectedClass = classes.find((c) => c.classSlug === prefs.classSlug) || null;
   let selectedSpec = selectedClass?.specs.find((s) => s.specId === prefs.specId) || null;
-  let mode = prefs.mode === 'raid' ? 'raid' : 'mplus';
+  let mode = prefs.mode === 'raid' && wclEnabled ? 'raid' : 'mplus';
+  if (!wclEnabled) recents = recents.filter((r) => r.mode !== 'raid');
 
   const classGrid = el('div.class-grid.inset');
   const specRow = el('div.spec-row');
@@ -190,7 +192,7 @@ export function renderSpecPicker(container, classes, prefs, onStart, { recents =
     el(
       'div.picker',
       recentRow,
-      el('div.segmented.mode-switch', modeButtons),
+      wclEnabled ? el('div.segmented.mode-switch', modeButtons) : null,
       el('h2.wow-header', 'Choose a Class'),
       classGrid,
       specRow,

@@ -3,7 +3,7 @@
 /**
  * A small synthetic Mythic+ analysis (the shape collector.analyze returns): 6 players of one
  * spec with a choice node, a multi-rank node and two hero trees, gear with enchants and gems,
- * and one of two dungeons loaded.
+ * races (one unknown), and one of two dungeons loaded.
  */
 
 const tree = {
@@ -66,12 +66,12 @@ function gearB() {
 
 function session() {
   const players = [
-    { name: 'P1', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: { 9: entry(buildB, 41, gearB(), 'STRB') } },
-    { name: 'P2', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: { 9: entry(buildB, 41, gearB(), 'STRB') } },
-    { name: 'P3', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: { 9: entry(buildA, 40, gearA(), 'STRA') } },
-    { name: 'P4', main: entry(buildB, 41, gearB(), 'STRB'), dungeons: { 9: null } },
-    { name: 'P5', main: entry(buildB, 41, gearB(), 'STRB'), dungeons: {} },
-    { name: 'P6', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: {} },
+    { name: 'P1', race: 'nightelf', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: { 9: entry(buildB, 41, gearB(), 'STRB') } },
+    { name: 'P2', race: 'nightelf', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: { 9: entry(buildB, 41, gearB(), 'STRB') } },
+    { name: 'P3', race: 'dwarf', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: { 9: entry(buildA, 40, gearA(), 'STRA') } },
+    { name: 'P4', race: null, main: entry(buildB, 41, gearB(), 'STRB'), dungeons: { 9: null } },
+    { name: 'P5', race: 'pandaren', main: entry(buildB, 41, gearB(), 'STRB'), dungeons: {} },
+    { name: 'P6', race: 'nightelf', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: {} },
   ].map((p, i) => ({ rank: i + 1, realm: 'R', realmSlug: 'r', region: 'eu', score: 3000 - i, links: {}, candidates: [], ...p }));
   return {
     meta: {
@@ -80,6 +80,7 @@ function session() {
       classSlug: 'mage',
       specSlug: 'frost',
       specId: 64,
+      classId: 8,
       region: 'world',
       requested: 6,
       since: null,

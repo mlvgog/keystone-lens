@@ -39,6 +39,7 @@ const state = {
 
 let teardown = null;
 let dom = null; // { header, banner, body } of the results screen
+let pickerShown = false; // the spec picker is on screen
 
 // ---------------------------------------------------------------- preferences (per-viewer convenience only)
 const PREFS_KEY = 'mplus-inspector-prefs';
@@ -76,11 +77,18 @@ function openSettings() {
   settingsDialog({
     onChanged: (settings, { localeChanged }) => {
       const wclChanged = settings.wclClientId !== state.settings?.wclClientId || settings.wclHasSecret !== state.settings?.wclHasSecret;
+      const wclToggled = settings.wclEnabled !== state.settings?.wclEnabled;
       state.settings = settings;
       if (localeChanged) applyTooltipLanguage();
-      if (wclChanged) {
+      if (wclToggled) {
         state.tp = null;
-        if (state.tab === 'damage') renderTab();
+        if (pickerShown) showPicker(); // with or without Raid mode
+        else if (dom && state.meta?.mode === 'raid' && !wclOn()) showPicker(); // raid results need Warcraft Logs
+        else if (dom && (showDamageTab() || state.tab === 'damage')) renderTab();
+      } else if (wclChanged) {
+        state.tp = null;
+        if (pickerShown) showPicker(); // the raid hint depends on the saved client
+        else if (state.tab === 'damage') renderTab();
       }
     },
   });
@@ -107,6 +115,7 @@ function setHeader(opts) {
 }
 
 function resetView() {
+  pickerShown = false;
   hideTooltip();
   teardown?.();
   teardown = null;
@@ -139,9 +148,11 @@ async function showPicker() {
   renderSpecPicker(viewEl, state.classes, prefs.picker || {}, (opts) => openSearch(opts), {
     recents: prefs.recents || [],
     defaults: { region: state.settings?.defaultRegion, sampleSize: state.settings?.defaultSize },
-    hasWcl: !!(state.settings?.wclClientId && state.settings?.wclHasSecret),
+    wclEnabled: wclOn(),
+    hasWcl: hasWcl(),
     onSettings: openSettings,
   });
+  pickerShown = true;
 }
 
 /** Recent searches open instantly from the cache (even if older than an hour). */
@@ -298,10 +309,20 @@ function showResults() {
   viewEl.append(el('div.results', header, banner, body));
   dom = { header, banner, body };
   tabs.hidden = false;
-  // Raid mode has no Damage tab (that tab is Mythic+ only).
-  tabs.querySelector('[data-tab=damage]').hidden = state.meta?.mode === 'raid';
-  if (state.meta?.mode === 'raid' && state.tab === 'damage') state.tab = 'talents';
+  showDamageTab();
   renderAll();
+}
+
+/**
+ * The Damage tab is there when the Warcraft Logs features are on (Settings), and not in raid mode
+ * (that tab is Mythic+ only). Returns whether the open tab had to change.
+ */
+function showDamageTab() {
+  const show = wclOn() && state.meta?.mode !== 'raid';
+  tabs.querySelector('[data-tab=damage]').hidden = !show;
+  if (show || state.tab !== 'damage') return false;
+  state.tab = 'talents';
+  return true;
 }
 
 function renderAll() {
@@ -512,6 +533,8 @@ const HEALER_SPECS = new Set([65, 105, 256, 257, 264, 270, 1468]);
 let tpView = null; // { setProgress } while the Damage tab shows a loading bar
 let tpToken = null;
 const hasWcl = () => !!(state.settings?.wclClientId && state.settings?.wclHasSecret);
+/** The Warcraft Logs features (Damage tab, Raid mode) are turned on in Settings. */
+const wclOn = () => state.settings?.wclEnabled === true;
 
 window.api.onProgress((p) => {
   if (p.kind === 'throughput') tpView?.setProgress?.(p);

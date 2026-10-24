@@ -3,7 +3,18 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULTS = { tooltipLocale: 0, defaultRegion: 'world', defaultSize: 50, wclClientId: '', wclClientSecret: '', updates: 'auto', wowPath: '', addonSync: true, addonAutoUpdate: true };
+const DEFAULTS = {
+  tooltipLocale: 0,
+  defaultRegion: 'world',
+  defaultSize: 50,
+  wclEnabled: false,
+  wclClientId: '',
+  wclClientSecret: '',
+  updates: 'auto',
+  wowPath: '',
+  addonSync: true,
+  addonAutoUpdate: true,
+};
 const REGIONS = ['world', 'us', 'eu', 'kr', 'tw'];
 const SIZES = [25, 50, 100];
 // auto: download and install updates; notify: only say a new version is out; off: never check on its own.
@@ -16,6 +27,7 @@ let vault = null; // { encrypt(string) -> base64, decrypt(base64) -> string }, e
 /**
  * Load the settings. With a `vault`, the Warcraft Logs secret is stored encrypted
  * (`wclClientSecretEnc`); a plain-text secret from an older version is encrypted on load.
+ * Versions before the Warcraft Logs switch had no `wclEnabled`: it starts on when a client is saved.
  */
 function init(baseDir, validLocales = [0], { vault: v = null } = {}) {
   file = path.join(baseDir, 'settings.json');
@@ -34,7 +46,8 @@ function init(baseDir, validLocales = [0], { vault: v = null } = {}) {
       secret = ''; // encrypted by another Windows user or machine: ask for it again
     }
   }
-  data = sanitize({ ...DEFAULTS, ...raw, wclClientSecret: secret }, validLocales);
+  const wclEnabled = typeof raw.wclEnabled === 'boolean' ? raw.wclEnabled : !!(raw.wclClientId && (raw.wclClientSecret || raw.wclClientSecretEnc));
+  data = sanitize({ ...DEFAULTS, ...raw, wclEnabled, wclClientSecret: secret }, validLocales);
   if (vault && raw.wclClientSecret) save();
   return get();
 }
@@ -50,6 +63,8 @@ function sanitize(s, validLocales) {
     tooltipLocale: validLocales.includes(Number(s.tooltipLocale)) ? Number(s.tooltipLocale) : DEFAULTS.tooltipLocale,
     defaultRegion: REGIONS.includes(s.defaultRegion) ? s.defaultRegion : DEFAULTS.defaultRegion,
     defaultSize: SIZES.includes(Number(s.defaultSize)) ? Number(s.defaultSize) : DEFAULTS.defaultSize,
+    // Damage tab and Raid mode (they need the user's own Warcraft Logs API client).
+    wclEnabled: typeof s.wclEnabled === 'boolean' ? s.wclEnabled : DEFAULTS.wclEnabled,
     wclClientId: credential(s.wclClientId),
     wclClientSecret: credential(s.wclClientSecret),
     updates: UPDATE_MODES.includes(s.updates) ? s.updates : DEFAULTS.updates,

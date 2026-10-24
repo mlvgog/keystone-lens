@@ -78,13 +78,13 @@ function parseItem(value) {
 }
 
 /**
- * { className, name, region, realmSlug, specName, level, talents, loadouts: [{ name, talents }],
+ * { className, name, region, realmSlug, race (e.g. "nightelf"), specName, level, talents, loadouts: [{ name, talents }],
  *   items: [{ slot, id, bonuses, enchantId, gemIds, craftedStats, statsFrom, ilvl, name }] }.
  * Item level and name come from the "# Name (ilvl)" comment the addon writes above each item.
  */
 function parseSimc(text) {
   const lines = String(text || '').split(/\r?\n/).map((l) => l.trim());
-  const out = { className: null, name: null, region: null, realmSlug: null, specName: null, level: null, talents: null, loadouts: [], items: [] };
+  const out = { className: null, name: null, region: null, realmSlug: null, race: null, specName: null, level: null, talents: null, loadouts: [], items: [] };
   let comment = null;
   let loadoutName = null;
   for (const line of lines) {
@@ -114,6 +114,7 @@ function parseSimc(text) {
     } else if (key === 'level') out.level = Number(value) || null;
     else if (key === 'region') out.region = value.toLowerCase();
     else if (key === 'server') out.realmSlug = value.toLowerCase();
+    else if (key === 'race') out.race = value.toLowerCase();
     else if (key === 'spec') out.specName = titleCase(value);
     else if (key === 'talents') out.talents = value;
     else if (SLOTS[key]) {

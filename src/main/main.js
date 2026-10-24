@@ -56,6 +56,7 @@ const { characterStatProfile } = require('./gearSummary');
 const http = require('./http');
 const { createUpdater, LATEST_RELEASE_API } = require('./updater');
 const { createAddonSync } = require('./addonSync');
+const races = require('./races');
 
 const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
 const EXTERNAL_HOSTS = new Set([
@@ -230,8 +231,14 @@ ipcMain.handle('analyze:cancel', () => {
   current = null;
 });
 
+// The Damage tab and Raid mode stay off until turned on in Settings (they need the user's own
+// Warcraft Logs API client); until then nothing is sent to Warcraft Logs.
+const wclEnabled = () => settings.get().wclEnabled === true;
+const WCL_DISABLED = { ok: false, code: 'WCL_DISABLED', error: 'Warcraft Logs features are turned off in Settings.' };
+
 /** Raid mode: the top logged kills of the spec on every boss of the current raid (Warcraft Logs). */
 ipcMain.handle('raid:start', async (event, opts, { force = false } = {}) => {
+  if (!wclEnabled()) return WCL_DISABLED;
   const controller = startTask();
   try {
     const raid = await loadRaid(opts, {
@@ -324,6 +331,15 @@ ipcMain.handle('character:import', async (_e, text, { loadout = 0 } = {}) => {
   }
 });
 
+/** Racial abilities of every race for a class: { ok, racials: { [raceKey]: [{ id, name, icon }] } }. */
+ipcMain.handle('races:racials', async (_e, classId) => {
+  try {
+    return { ok: true, racials: await races.racialsByRace(Number(classId) || null) };
+  } catch (err) {
+    return failure(err);
+  }
+});
+
 ipcMain.handle('realms:list', async (_e, region) => {
   try {
     return await raiderio.getRealms(region);
@@ -405,6 +421,11 @@ ipcMain.handle('settings:get', () => ({ settings: settings.getPublic(), locales:
 ipcMain.handle('settings:set', (_e, patch) => {
   settings.set(patch, LOCALE_IDS);
   if ('wclClientId' in patch || 'wclClientSecret' in patch) wcl.forgetToken();
+  if (patch.wclEnabled === false) {
+    throughputTask?.abort(); // a Damage tab load that is running
+    throughputTask = null;
+    wcl.forgetToken();
+  }
   if ('updates' in patch) updater?.setMode(settings.get().updates);
   if (patch.addonSync === false) addonSync?.pause(); // stop a refresh that is running
   if (patch.addonSync === true) addonSync?.resume();
@@ -477,6 +498,7 @@ function initAddonSync() {
     specOptions,
     analyze,
     loadDungeon,
+    racials: (classId) => races.racialsByRace(classId),
     onStatus: (status) => {
       if (win && !win.isDestroyed()) win.webContents.send('addon:status', status);
     },
@@ -533,6 +555,7 @@ const MAX_LEVELS = 15;
 /** Damage / healing per dungeon from Warcraft Logs for the current spec (plus your own runs). */
 ipcMain.handle('throughput:get', async (event, params = {}) => {
   if (!session) return failure(new Error('No analysis loaded'));
+  if (!wclEnabled()) return WCL_DISABLED;
   if (!wcl.hasCredentials()) return { ok: false, code: 'WCL_NO_CREDENTIALS' };
   throughputTask?.abort();
   const controller = new AbortController();
@@ -660,6 +683,7 @@ ipcMain.handle('throughput:cancel', () => {
 });
 
 ipcMain.handle('wcl:test', async () => {
+  if (!wclEnabled()) return WCL_DISABLED;
   try {
     return { ok: true, limits: await wcl.testConnection() };
   } catch (err) {

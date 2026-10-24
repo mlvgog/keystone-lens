@@ -293,6 +293,80 @@ test('the overview shows the top players\' gear as a character pane', async () =
   assert.deepEqual(addon.errors(L), []);
 });
 
+test('the overview shows the races the top players pick, with their racials', async () => {
+  const racials = async () => ({
+    nightelf: [{ id: 58984, name: 'Shadowmeld' }, { id: 20582, name: 'Quickness' }, { id: 154748, name: 'Touch of Elune' }],
+    dwarf: [{ id: 20594, name: 'Stoneform' }],
+  });
+  const rec = await specRecord(session(), { racials });
+  // More races than the strip shows (5).
+  rec.races.push(
+    { key: 'human', id: 1, ids: [1], name: 'Human', n: 1, faction: 'alliance' },
+    { key: 'gnome', id: 7, ids: [7], name: 'Gnome', n: 1, faction: 'alliance' },
+    { key: 'voidelf', id: 29, ids: [29], name: 'Void Elf', n: 1, faction: 'alliance' }
+  );
+  const L = addon.loadAddon({ before: [dataFileText({ 64: rec }, { appVersion: '1.2.0' })] });
+  addon.run(L, '__player.raceID = 4'); // you are a Night Elf
+  addon.run(L, MY_NODES);
+  addon.run(L, MY_GEAR);
+  addon.run(L, '__ns:TogglePanel(); __runTimers()');
+
+  // Names in the game's language when it knows the race; the game's portrait atlas when it has one.
+  const rows = addon.evaluate(L, '__ns.RaceRows(__ns:GetSpecData(64))');
+  assert.deepEqual(
+    rows.map((r) => [r.key, r.name, r.n, Math.round(r.share * 100), r.atlas ?? null, r.mine]),
+    [
+      ['nightelf', 'Nachtelf', 3, 50, 'raceicon128-nightelf-male', true],
+      ['dwarf', 'Zwerg', 1, 17, 'raceicon-dwarf-male', false],
+      ['pandaren', 'Pandaren', 1, 17, null, false],
+      ['human', 'Mensch', 1, 17, null, false],
+      ['gnome', 'Gnome', 1, 17, null, false],
+      ['voidelf', 'Void Elf', 1, 17, null, false],
+    ]
+  );
+  assert.equal(rows[2].icon, 'Interface\\Icons\\INV_Misc_QuestionMark', 'no atlas and no racials: a question mark');
+
+  // The strip: five races with their share, yours ticked, the rest behind "+1".
+  const strip = 'KeystoneLensFrame.overview.races';
+  assert.equal(addon.evaluate(L, `${strip}.shown`), true);
+  assert.equal(addon.evaluate(L, `${strip}.empty.shown`), false);
+  assert.equal(addon.evaluate(L, `${strip}.buttons[1].icon.atlas`), 'raceicon128-nightelf-male');
+  assert.equal(addon.evaluate(L, `${strip}.buttons[1].pct.text`), '50%');
+  assert.equal(addon.evaluate(L, `${strip}.buttons[1].tick.shown`), true);
+  assert.equal(addon.evaluate(L, `${strip}.buttons[2].tick.shown`), false);
+  assert.equal(addon.evaluate(L, `${strip}.buttons[5].race.key`), 'gnome');
+  assert.equal(addon.evaluate(L, `${strip}.more.shown`), true);
+  assert.equal(addon.evaluate(L, `${strip}.more.text.text`), '+1');
+  addon.run(L, `${strip}.more.scripts.OnEnter(${strip}.more)`);
+  assert.match(addon.evaluate(L, 'GameTooltip.lines[2]'), /Void Elf.* 17%/);
+  addon.run(L, `${strip}.buttons[1].scripts.OnEnter(${strip}.buttons[1])`);
+  assert.deepEqual(addon.evaluate(L, 'GameTooltip.lines').slice(1, 4), ['3 of the top 6 (50%)', 'Alliance', 'Your race']);
+
+  // The racials flyout: names, icons and "passive" from the game, the app's name as a fallback.
+  const lines = addon.evaluate(L, `__ns.FillRacials(${strip}.buttons[1].race)`);
+  assert.deepEqual(lines, [
+    { id: 58984, name: 'Horgonblick', icon: 132089, passive: false },
+    { id: 20582, name: 'Schnelligkeit', icon: 132150, passive: true },
+    { id: 154748, name: 'Touch of Elune', icon: 1000 + 154748, passive: false },
+  ]);
+  assert.equal(addon.evaluate(L, `#__ns.FillRacials(${strip}.buttons[3].race)`), 0, 'Pandaren: no racials in the data');
+  addon.run(L, `${strip}.buttons[1].scripts.OnClick(${strip}.buttons[1])`);
+  addon.run(L, `${strip}.buttons[1].scripts.OnClick(${strip}.buttons[1])`);
+  addon.run(L, '__ns.HideRacials()');
+  assert.deepEqual(addon.errors(L), []);
+});
+
+test('data from before races were exported shows a hint instead of the races', async () => {
+  const L = addon.loadAddon({ before: [await appData({ races: undefined })] });
+  addon.run(L, '__ns:TogglePanel(); __runTimers()');
+  const strip = 'KeystoneLensFrame.overview.races';
+  assert.equal(addon.evaluate(L, `#__ns.RaceRows(__ns:GetSpecData(64))`), 0);
+  assert.equal(addon.evaluate(L, `${strip}.empty.shown`), true);
+  assert.equal(addon.evaluate(L, `${strip}.buttons[1].shown`), false);
+  assert.equal(addon.evaluate(L, `${strip}.more.shown`), false);
+  assert.deepEqual(addon.errors(L), []);
+});
+
 test('the build pane lists the builds and what each changes in yours', async () => {
   const L = await openWindow();
   const card = (i, field) => addon.evaluate(L, `KeystoneLensBuildsFrame.cards[${i}].${field}`);

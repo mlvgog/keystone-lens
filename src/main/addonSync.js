@@ -34,6 +34,7 @@ function withServerSlug(simc, realm) {
  * - bundledAddonDir: the addon that ships with the app
  * - appVersion
  * - specOptions(specId) -> analyze() options for a spec, or null
+ * - racials(classId) -> racial abilities per race, for the records (races.racialsByRace); optional
  * - analyze(opts, { signal }) -> { session }; loadDungeon(session, zoneId, { signal })
  * - onStatus(status): called when something visible changes
  * - findWowFolder, setTimeout, clearTimeout: injectable for tests
@@ -47,6 +48,7 @@ function createAddonSync(deps) {
     specOptions,
     analyze,
     loadDungeon,
+    racials = null,
     onStatus = () => {},
     findWowFolder = wow.findWowFolder,
     setTimeout: setTimer = setTimeout,
@@ -199,7 +201,7 @@ function createAddonSync(deps) {
   async function recordSession(session) {
     if (!session || session.meta?.mode === 'raid') return false;
     try {
-      records[session.meta.specId] = await specRecord(session);
+      records[session.meta.specId] = await specRecord(session, { racials });
       await saveStore();
     } catch (err) {
       lastError = `Could not prepare the addon data: ${err.message}`;

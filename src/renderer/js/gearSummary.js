@@ -1,4 +1,5 @@
 import { el, iconImg, pct, qualityColor, fmtDelta, relDate } from './util.js';
+import { raceCard } from './races.js';
 
 let open = true; // the Overview stays expanded/collapsed across re-renders
 
@@ -143,6 +144,7 @@ export function renderGearOverview(ctx) {
     'div.ov-grid',
     view.trends ? trendsCard(ctx) : null,
     statCard(view.statProfile, ctx.character?.statProfile),
+    raceCard(view.races, ctx.meta, ctx.character),
     enchantCard(s, N),
     gemCard(s, N),
     tierCard(s, N)

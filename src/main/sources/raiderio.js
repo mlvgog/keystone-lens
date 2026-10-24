@@ -77,6 +77,12 @@ async function getRaids(expansionId, { signal } = {}) {
 /** raider.io serves this many pages (of 20 runs) per top-runs list without an access key. */
 const TOP_RUN_PAGES = 100;
 
+/** A roster member's race ({ id, name }), or null when raider.io leaves it out. */
+function rosterRace(race) {
+  if (!race || (race.id == null && !race.name)) return null;
+  return { id: race.id ?? null, name: race.name || null };
+}
+
 /** Runs of the published top-runs list, with the roster of each run. */
 function parseTopRuns(json) {
   return (json?.rankings || [])
@@ -97,6 +103,7 @@ function parseTopRuns(json) {
           realm: m.character.realm?.name || null,
           realmSlug: m.character.realm?.slug || null,
           region: m.character.region?.slug || null,
+          race: rosterRace(m.character.race),
         })),
     }));
 }
@@ -117,7 +124,7 @@ async function getTopRuns({ season, region, dungeon, page }, { signal, force } =
   }, { force });
 }
 
-/** Season scores, best key per dungeon and the 10 most recent keys from a character profile. */
+/** Season scores, best key per dungeon, the 10 most recent keys, race and faction from a character profile. */
 function parseMythicPlusProfile(json) {
   const run = (r) => ({
     id: r.keystone_run_id,
@@ -130,6 +137,8 @@ function parseMythicPlusProfile(json) {
     segments: json?.mythic_plus_scores_by_season?.[0]?.segments || {},
     bestRuns: (json?.mythic_plus_best_runs || []).filter((r) => r?.keystone_run_id).map(run),
     recentRuns: (json?.mythic_plus_recent_runs || []).filter((r) => r?.keystone_run_id).map(run),
+    race: (typeof json?.race === 'string' ? json.race : json?.race?.name) || null,
+    faction: (typeof json?.faction === 'string' ? json.faction : null) || null,
   };
 }
 
@@ -148,12 +157,13 @@ async function getMythicPlusProfile({ region, realmSlug, name }, { signal, force
     `${BASE}/api/v1/characters/profile?region=${encodeURIComponent(region)}` +
     `&realm=${encodeURIComponent(realmSlug)}&name=${encodeURIComponent(name)}` +
     `&fields=mythic_plus_scores_by_season:current,mythic_plus_best_runs,mythic_plus_recent_runs`;
-  return cache.cached('profile', url, async () => {
+  // "#race": profiles cached by versions without the race are not reused.
+  return cache.cached('profile', `${url}#race`, async () => {
     try {
       return parseMythicPlusProfile(await fetchJson(url, { signal }));
     } catch (err) {
       // Missing/renamed characters are not fatal: we still have the key they were found in.
-      if (err.status === 400 || err.status === 404) return { segments: {}, bestRuns: [], recentRuns: [], missing: true };
+      if (err.status === 400 || err.status === 404) return { segments: {}, bestRuns: [], recentRuns: [], race: null, faction: null, missing: true };
       throw err;
     }
   }, { force });
@@ -254,6 +264,7 @@ async function getCharacter({ region, realm, name }, { signal, force } = {}) {
       realmSlug,
       region: d.region || region,
       className: d.class,
+      race: (typeof d.race === 'string' ? d.race : d.race?.name) || null,
       activeSpecName: d.active_spec_name,
       itemLevel: d.gear?.item_level_equipped ?? null,
       profileUrl: d.profile_url,

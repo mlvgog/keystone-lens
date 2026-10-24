@@ -5,8 +5,9 @@
 - talent pick rates on an in-game-style talent tree;
 - popular builds with copyable import strings;
 - gear usage per slot, with stats, enchants, gems and where each item drops;
-- damage and healing per dungeon from Warcraft Logs, compared with your own runs;
-- a **game addon** that shows the same pick rates, builds and gear inside World of Warcraft.
+- the races they play, with each race's racial abilities;
+- optionally, damage and healing per dungeon and raid rankings from Warcraft Logs (with your own API key);
+- a **game addon** that shows the same pick rates, builds, gear and races inside World of Warcraft.
 
 ![Talent tree with pick rates for the top 50 Subtlety Rogues](docs/screenshots/talents.jpg)
 
@@ -37,13 +38,14 @@ Get the latest version from the [**Releases**](https://github.com/mlvgog/keyston
 ![Gear overview with stat profile, enchants, gems and per-slot item usage](docs/screenshots/gear.jpg)
 
 - **Items per slot.** Every slot lists the items used and how many players use each one, with the item's exact stats at its item level, enchants and gems. It also shows **where the item drops**: M+ dungeon, raid boss, crafted or tier. Rings and trinkets are combined. Hover an item for its full in-game tooltip.
-- **Overview.** Secondary-stat profile, top enchant per slot, gems and embellishments, tier pieces and weapon setups.
+- **Overview.** Secondary-stat profile, the races the players play, top enchant per slot, gems and embellishments, tier pieces and weapon setups.
+- **Races.** How many of the players play each race, with your own race marked. Click a race for a small menu with its racial abilities for the spec's class; hover one for its tooltip.
 
 ### Players
 
 ![Players table with scores, keys and builds](docs/screenshots/players.jpg)
 
-- **Player list.** Every sampled player with their score, the key their data comes from, hero tree, build and item level. The list is sortable and searchable, with region and key-level filters. Each player has **Copy build** and links to raider.io, Warcraft Logs and the Armory.
+- **Player list.** Every sampled player with their race, score, the key their data comes from, hero tree, build and item level. The list is sortable and searchable, with region and key-level filters. Each player has **Copy build** and links to raider.io, Warcraft Logs and the Armory.
 - **Inspect.** Click a player to see their own talent tree and gear.
 
 ### Filters
@@ -66,14 +68,14 @@ Get the latest version from the [**Releases**](https://github.com/mlvgog/keyston
 - **Per boss and difficulty.** Switch the class picker to **Raid**, pick a difficulty, and the app loads the top 100 logged kills of the spec on every boss of the current raid. It ranks them by damage, or by healing for healers, and reads each player's talents and gear at that kill.
 - **Same views as Mythic+.** The talent tree, popular builds (with import strings), gear and players work as they do for Mythic+. The **Boss** filter shows a single boss.
 - **Picked differently on a boss.** With a boss selected, a small card lists the talents the top players pick noticeably more or less there than on the other bosses. Those talents are ringed on the tree.
-- **Warcraft Logs client and limits.** Raid mode needs your Warcraft Logs client (see below). One raid load is about 10 lookups. Warcraft Logs also has an hourly limit you can't see, so a few raid loads in an hour can use it up. Loaded data is kept in memory for 30 minutes and never saved.
+- **Warcraft Logs client and limits.** Raid mode is there once the Warcraft Logs features are on, and needs your Warcraft Logs client (see below). One raid load is about 10 lookups. Warcraft Logs also has an hourly limit you can't see, so a few raid loads in an hour can use it up. Loaded data is kept in memory for 30 minutes and never saved.
 
 ### Game addon
 
 The **Keystone Lens addon** brings the Mythic+ data into the game:
 
 - **Talent window.** The pick rate of every talent appears under it, with choice splits on choice nodes. A red frame marks a popular talent you skip, and an orange frame a rare one you take. A switch in the window's title row changes between all dungeons and each dungeon. It starts on the dungeon of your keystone.
-- **The `/kl` window.** The top players' gear as a character pane: each slot shows the most used item with its %, with a tick when you wear it. Click a slot for every option, its enchants, and the gems. In the middle are bars for their secondary stats next to yours, as rating and %. A side pane lists the popular builds per dungeon. Each build shows the talents it changes compared with yours, a Copy button for its string, and **Show on talents**, which frames those changes on your talent window.
+- **The `/kl` window.** The top players' gear as a character pane: each slot shows the most used item with its %, with a tick when you wear it. Click a slot for every option, its enchants, and the gems. In the middle are bars for their secondary stats next to yours, as rating and %. At the bottom are the races they play; click one for its racial abilities. A side pane lists the popular builds per dungeon. Each build shows the talents it changes compared with yours, a Copy button for its string, and **Show on talents**, which frames those changes on your talent window.
 - **Item tooltips.** How many top players of your spec use an item.
 - **Your characters in the app.** The addon saves your talents and gear when you log out or `/reload`. They show up under "From the game addon" in **Compare with my character**, so you don't need to paste a SimulationCraft export.
 
@@ -88,17 +90,20 @@ The addon gets Mythic+ data only. Warcraft Logs data (damage, raid) stays in the
 
 ### Other
 
-- **Settings (⚙).** Tooltip language (9 languages), default region and player count, updates (automatic, only tell me, or off).
+- **Settings (⚙).** Tooltip language (9 languages), default region and player count, the Warcraft Logs features (off by default), updates (automatic, only tell me, or off).
 - **Reopen last results.** The app reopens your last results instantly.
 - **Developer menu (Ctrl+Shift+D).** Download statistics per data source.
 
-## Setting up the Damage tab
+## Setting up the Damage tab and Raid mode
 
-The Damage tab uses the Warcraft Logs API, which needs your own free API client. Warcraft Logs does not allow API keys to be shipped inside open-source apps.
+The Damage tab and Raid mode use the Warcraft Logs API, which needs your own free API client. Warcraft Logs does not allow API keys to be shipped inside open-source apps, and every client has an hourly limit. So both are off until you turn them on.
 
-1. Sign in at [warcraftlogs.com](https://www.warcraftlogs.com) and open <https://www.warcraftlogs.com/api/clients/>.
-2. Click **Create Client** and give it a **descriptive name**, for example `Keystone Lens - <your name>`. Warcraft Logs may remove clients whose purpose isn't clear. Use `http://localhost` as the redirect URL and leave **Public Client** unchecked.
-3. In Keystone Lens, open **⚙ Settings → Warcraft Logs**, paste the client ID and secret, and press **Save & test**.
+1. In Keystone Lens, open **⚙ Settings → Warcraft Logs** and tick **Damage numbers and Raid mode**. A window explains what they add and why a key is needed; click **Turn on**.
+2. Sign in at [warcraftlogs.com](https://www.warcraftlogs.com) and open <https://www.warcraftlogs.com/api/clients/>.
+3. Click **Create Client** and give it a **descriptive name**, for example `Keystone Lens - <your name>`. Warcraft Logs may remove clients whose purpose isn't clear. Use `http://localhost` as the redirect URL and leave **Public Client** unchecked.
+4. Back in **⚙ Settings → Warcraft Logs**, paste the client ID and secret, and press **Save & test**.
+
+While the features are off, the app never contacts Warcraft Logs. If you had a client saved before version 1.2.0, they stay on.
 
 The secret is stored only on your PC, encrypted for your Windows account, and is only ever sent to warcraftlogs.com.
 
@@ -139,11 +144,11 @@ Keystone Lens has no server of its own. Your PC talks to these services directly
 
 | Source | Used for |
 |---|---|
-| [raider.io](https://raider.io) | Top keys, players' scores and key history, talent and gear snapshots per key, your character, dungeon, raid and realm lists. Uses the [public API](https://raider.io/api). |
+| [raider.io](https://raider.io) | Top keys, players' scores, races and key history, talent and gear snapshots per key, your character, dungeon, raid and realm lists. Uses the [public API](https://raider.io/api). |
 | [Wowhead](https://www.wowhead.com) | Hover tooltips for items and talents, through Wowhead's [official tooltips script](https://www.wowhead.com/tooltips). Where items drop and their type, from Wowhead's documented item XML. |
-| [SimulationCraft](https://github.com/simulationcraft/simc) | Its open game data (GPL-3.0, downloaded from GitHub at runtime, not bundled): talent tree structure and item-level scaling tables. |
+| [SimulationCraft](https://github.com/simulationcraft/simc) | Its open game data (GPL-3.0, downloaded from GitHub at runtime, not bundled): talent tree structure, item-level scaling tables and racial abilities. |
 | [wago.tools](https://wago.tools) | Game table exports: talent positions, connections and icons, item stat allocations and bonus IDs. |
-| [Warcraft Logs](https://www.warcraftlogs.com) | Damage and healing per dungeon, and your logged runs. Optional, with your own API client. |
+| [Warcraft Logs](https://www.warcraftlogs.com) | Damage and healing per dungeon, your logged runs, and Raid mode. Optional and off by default, with your own API client. |
 | Icon servers | Icons from raider.io's image server, with Blizzard's as a fallback. |
 | [GitHub](https://github.com/mlvgog/keystone-lens/releases) | App updates: the newest release of this project. Can be turned off. |
 
@@ -185,7 +190,8 @@ Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md), the
 | `src/main/selection.js` | Which key represents a player |
 | `src/main/simc.js`, `loadout.js`, `simcImport.js` | SimulationCraft export parsing, in-game talent strings (decode and encode), and your character from an export |
 | `src/main/raid.js`, `raidLoader.js` | Raid mode: Warcraft Logs boss rankings as a session for the views, and boss-specific talent differences |
-| `src/main/views.js` | Filtered statistics for the UI (hero tree, dungeon, build, trends) |
+| `src/main/views.js` | Filtered statistics for the UI (hero tree, dungeon, build, trends, races) |
+| `src/main/races.js` | Playable races, and their racial abilities from SimulationCraft's game data |
 | `src/main/aggregate.js`, `builds.js`, `gearSummary.js`, `itemInfo.js` | Talent and gear counting, build clustering, stat profile, item source parsing |
 | `src/main/throughput.js` | Damage and healing statistics |
 | `src/main/history.js`, `settings.js`, `stats.js`, `cache.js` | Trend snapshots, settings, download statistics, cache |

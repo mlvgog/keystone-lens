@@ -14,6 +14,7 @@
  *   enchants: { [slotGroup]: [{ id, name, n }] }, gems: [{ id, name, n }], gemSockets (gems socketed in all),
  *   embellishments: [{ id, name, n }], stats: { crit, haste, mastery, vers } (share of their secondary stats),
  *   statRatings: { crit, haste, mastery, vers } (average rating from gear and gems, enchants not counted),
+ *   races: [{ key, id (a game race id), ids (all of the race's ids), name, n, faction, spells: [{ id, name }] (racials of this class) }],
  *   dungeonList: [{ id, name, short, map }],
  *   dungeons: { [zoneId]: { sample, hero, talents, builds } } }
  */
@@ -23,6 +24,7 @@ const path = require('path');
 const { buildView, samplePlayers } = require('./views');
 const { SLOT_GROUPS, cleanEnchantName, stripEscapes } = require('./aggregate');
 const { toLua } = require('./lua');
+const { raceByKey } = require('./races');
 
 const SCHEMA = 1;
 const DATA_ADDON = 'KeystoneLens_Data';
@@ -162,11 +164,37 @@ function statRatingsRecord(profile) {
   return Object.fromEntries(profile.stats.map((s) => [s.key, Math.round(s.avg)]));
 }
 
-/** The record of one analysed spec (Mythic+ sessions only). */
-async function specRecord(session) {
+/** The races the players play, with each race's racials for the spec's class (when they could be loaded). */
+function racesRecord(races, racials) {
+  if (!races?.list?.length) return undefined;
+  return races.list.map((r) => ({
+    key: r.key,
+    id: raceByKey(r.key).ids[0],
+    ids: raceByKey(r.key).ids,
+    name: r.name,
+    n: r.count,
+    faction: r.faction,
+    spells: racials?.[r.key]?.map((s) => ({ id: s.id, name: s.name })),
+  }));
+}
+
+/**
+ * The record of one analysed spec (Mythic+ sessions only).
+ * `racials(classId)` -> { [raceKey]: [{ id, name }] } adds the racial abilities (races.racialsByRace);
+ * without it, or when it fails (offline), the races are written without them.
+ */
+async function specRecord(session, { racials = null } = {}) {
   const { meta, tree } = session;
   if (meta.mode === 'raid') throw new Error('Raid data (Warcraft Logs) is not exported to the addon.');
   const view = await buildView(session, {}, {});
+  let racialsByRace = null;
+  if (racials && view.races?.list?.length) {
+    try {
+      racialsByRace = await racials(meta.classId ?? null);
+    } catch {
+      racialsByRace = null;
+    }
+  }
   const { enchants, gems, gemSockets } = enchantsAndGems(samplePlayers(session, null).map((x) => x.d.items || {}));
   const record = {
     specId: meta.specId,
@@ -190,6 +218,7 @@ async function specRecord(session) {
     embellishments: view.gearSummary.embellishments.items.slice(0, TOP_GEMS).map((e) => ({ id: e.id, name: e.name || undefined, n: e.count })),
     stats: statsRecord(view.statProfile),
     statRatings: statRatingsRecord(view.statProfile),
+    races: racesRecord(view.races, racialsByRace),
     dungeonList: meta.dungeons.map((d) => ({ id: d.id, name: d.name, short: d.shortName || undefined, map: d.challengeModeId || undefined })),
     dungeons: {},
   };

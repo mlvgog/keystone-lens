@@ -90,3 +90,39 @@ test('the addon updates itself unless turned off', () => {
   settings.set({ addonAutoUpdate: 'no' });
   assert.equal(settings.get().addonAutoUpdate, true);
 });
+
+test('Warcraft Logs features are off by default and keep an explicit choice', () => {
+  const dir = tempDir();
+  settings.init(dir, [0], { vault });
+  assert.equal(settings.get().wclEnabled, false);
+  assert.equal(settings.getPublic().wclEnabled, false);
+  settings.set({ wclEnabled: true });
+  settings.init(dir, [0], { vault });
+  assert.equal(settings.get().wclEnabled, true);
+  settings.set({ wclEnabled: 'yes' }); // not a boolean: the default, like other invalid values
+  assert.equal(settings.get().wclEnabled, false);
+
+  // Turned off with a client saved: stays off.
+  settings.set({ wclEnabled: false, wclClientId: 'client', wclClientSecret: 's3cret' });
+  settings.init(dir, [0], { vault });
+  assert.equal(settings.get().wclEnabled, false);
+  assert.equal(settings.get().wclClientSecret, 's3cret');
+});
+
+test('settings from before the Warcraft Logs switch keep the features on when a client is saved', () => {
+  const withClient = tempDir();
+  fs.writeFileSync(path.join(withClient, 'settings.json'), JSON.stringify({ wclClientId: 'client', wclClientSecretEnc: vault.encrypt('s3cret') }));
+  settings.init(withClient, [0], { vault });
+  assert.equal(settings.get().wclEnabled, true);
+
+  const plain = tempDir();
+  fs.writeFileSync(path.join(plain, 'settings.json'), JSON.stringify({ wclClientId: 'client', wclClientSecret: 'old' }));
+  settings.init(plain, [0], { vault });
+  assert.equal(settings.get().wclEnabled, true);
+
+  const idOnly = tempDir();
+  fs.writeFileSync(path.join(idOnly, 'settings.json'), JSON.stringify({ wclClientId: 'client', defaultSize: 25 }));
+  settings.init(idOnly, [0], { vault });
+  assert.equal(settings.get().wclEnabled, false);
+  assert.equal(settings.get().defaultSize, 25);
+});

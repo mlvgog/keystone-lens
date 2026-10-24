@@ -1,5 +1,5 @@
 -- Keystone Lens: the Overview tab's character pane: the top players' gear slot by slot, a flyout
--- with every option per slot, and their secondary stats next to yours.
+-- with every option per slot, their secondary stats next to yours, and their races (Races.lua).
 local _, ns = ...
 
 local SLOT = 37 -- slot button size
@@ -540,6 +540,10 @@ function ns.CreateGearView(parent)
   view.stats = createStats(view, centreWidth)
   view.stats:SetPoint("TOP", view.build, "BOTTOM", 0, -14)
 
+  view.races = ns.CreateRaceStrip(view)
+  view.races:SetPoint("BOTTOMLEFT", view, "BOTTOMLEFT", 14, 8)
+  view.races:SetPoint("BOTTOMRIGHT", view, "BOTTOMRIGHT", -14, 8)
+
   view.empty = view:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   view.empty:SetPoint("CENTER", view, "CENTER", 0, 20)
   view.empty:SetWidth(380)
@@ -558,7 +562,7 @@ function ns.RenderGear(view, rec, specID)
   for _, b in ipairs(view.slots) do
     b:SetShown(show)
   end
-  for _, region in ipairs({ view.header, view.sub, view.hero, view.build, view.stats }) do
+  for _, region in ipairs({ view.header, view.sub, view.hero, view.build, view.stats, view.races }) do
     region:SetShown(show)
   end
   view.empty:SetShown(not show)
@@ -592,4 +596,5 @@ function ns.RenderGear(view, rec, specID)
     view.build.text:SetText(string.format("|cffffd100%d popular builds|r", #v.builds))
   end
   setStats(view.stats, rec, ownClass and ns.MyGearStats() or nil, ownSpec)
+  ns.RenderRaces(view.races, rec)
 end

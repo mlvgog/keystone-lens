@@ -3,7 +3,7 @@
 -- Info: where the data comes from, settings and commands.
 local _, ns = ...
 
-local WIDTH, HEIGHT = 580, 500
+local WIDTH, HEIGHT = 580, 545
 
 local panel -- the window
 local view = { tab = 1, specID = nil } -- tab 1 = Overview, 2 = Info
@@ -122,7 +122,7 @@ local function createInfo(parent)
   s:text("GameFontNormal", 12):SetText("Commands")
   s:text(nil, 4):SetText("/kl: this window · /kl talents · /kl tooltips · /kl status · /kl options")
   s:text("GameFontNormal", 16):SetText("Sources")
-  s:text("GameFontDisableSmall", 4):SetText("Players, keys, talents and gear: raider.io (via the app). Not affiliated with Blizzard Entertainment or raider.io.")
+  s:text("GameFontDisableSmall", 4):SetText("Players, keys, talents, gear and races: raider.io (via the app). Racial abilities: the game's data via SimulationCraft. Not affiliated with Blizzard Entertainment or raider.io.")
   return info
 end
 
@@ -328,6 +328,7 @@ local function createPanel()
   end)
   panel:SetScript("OnHide", function()
     ns.HideFlyout()
+    ns.HideRacials()
   end)
 end
 

@@ -8,6 +8,7 @@ const COLUMNS = [
   { key: 'rank', label: 'Rank', num: true, value: (p) => p.rank },
   { key: 'name', label: 'Player', value: (p) => p.name.toLowerCase() },
   { key: 'realm', label: 'Realm', value: (p) => `${p.realm} ${p.region}`.toLowerCase() },
+  { key: 'race', label: 'Race', value: (p) => p.race || '~' },
   { key: 'score', label: 'M+ Score', num: true, value: (p) => p.score, desc: true },
   { key: 'key', label: 'Key used for talents & gear', value: (p) => p.run.level * 1000 + (p.run.score || 0), desc: true },
   { key: 'keyScore', label: 'Key score', num: true, value: (p) => p.run.score || 0, desc: true },
@@ -170,6 +171,7 @@ export function renderPlayers(container, ctx) {
           el('td.num', String(p.rank)),
           el('td', { style: { color: meta.color } }, p.name),
           el('td.dim', `${p.realm} (${String(p.region).toUpperCase()})`),
+          el('td.dim', p.race || ''),
           el('td.num', { style: { color: p.scoreColor || '#fff' } }, p.score.toFixed(1)),
           el('td', `+${p.run.level} ${p.run.dungeon}`),
           el('td.num', p.run.score != null ? p.run.score.toFixed(1) : ''),
@@ -188,7 +190,7 @@ export function renderPlayers(container, ctx) {
         );
         if (inspect?.index === p.index) tr.classList.add('selected');
         if (p.fallback && !raid) {
-          attachTooltip(tr.children[7], () => el('div', el('div.tt-gold', 'No key on the current patch'), el('div.tt-grey', 'Talents and gear come from this player’s best key on an older patch.')));
+          attachTooltip(tr.children[columns.findIndex((c) => c.key === 'patch')], () => el('div', el('div.tt-gold', 'No key on the current patch'), el('div.tt-grey', 'Talents and gear come from this player’s best key on an older patch.')));
         }
         return tr;
       })
