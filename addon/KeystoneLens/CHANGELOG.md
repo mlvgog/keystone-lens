@@ -1,5 +1,10 @@
 # Keystone Lens addon
 
+## 1.1.0
+
+- **Popular races:** a strip at the bottom of `/kl` shows the races the top players of the spec play, with each race's share and your own race ticked. Click a race for its racial abilities for your class, with the game's tooltips. Needs data from Keystone Lens app 1.2.0 or newer; older data shows a hint instead.
+- The window is a little taller to make room for it.
+
 ## 1.0.0
 
 First release.

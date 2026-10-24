@@ -48,6 +48,31 @@ test('a spec record holds pick rates, builds, gear, enchants and gems', async ()
   assert.deepEqual(r.dungeons[9].builds[0].choices, { 2: 22 });
 });
 
+test('races are exported with the racials of the spec\'s class', async () => {
+  const asked = [];
+  const racials = async (classId) => {
+    asked.push(classId);
+    return { nightelf: [{ id: 58984, name: 'Shadowmeld', icon: 'ability_ambush' }], dwarf: [{ id: 20594, name: 'Stoneform', icon: 'x' }] };
+  };
+  const r = await specRecord(session(), { racials });
+  assert.deepEqual(asked, [8], 'the class of the spec (Mage)');
+  assert.deepEqual(r.races, [
+    { key: 'nightelf', id: 4, ids: [4], name: 'Night Elf', n: 3, faction: 'alliance', spells: [{ id: 58984, name: 'Shadowmeld' }] },
+    { key: 'dwarf', id: 3, ids: [3], name: 'Dwarf', n: 1, faction: 'alliance', spells: [{ id: 20594, name: 'Stoneform' }] },
+    { key: 'pandaren', id: 24, ids: [24, 25, 26], name: 'Pandaren', n: 1, faction: 'both', spells: undefined },
+  ]);
+
+  // Offline (or no racials given): the races without their spells.
+  const offline = await specRecord(session(), { racials: async () => { throw new Error('offline'); } });
+  assert.deepEqual(offline.races.map((x) => [x.key, x.spells]), [['nightelf', undefined], ['dwarf', undefined], ['pandaren', undefined]]);
+  assert.equal((await specRecord(session())).races.length, 3);
+
+  // No race known (old data): no field.
+  const s = session();
+  for (const p of s.players) p.race = null;
+  assert.equal((await specRecord(s, { racials })).races, undefined);
+});
+
 test('raid sessions are never exported', async () => {
   const s = session();
   s.meta.mode = 'raid';
@@ -70,6 +95,8 @@ test('the data file loads in Lua with every spec', async () => {
   assert.equal(lua.evaluate(L, `${DATA_GLOBAL}.specs[64].builds[1].picks[3]`), 2);
   assert.equal(lua.evaluate(L, `${DATA_GLOBAL}.specs[64].gear.rings[1].id`), 400);
   assert.equal(lua.evaluate(L, `${DATA_GLOBAL}.specs[64].dungeons[9].sample`), 3);
+  assert.equal(lua.evaluate(L, `${DATA_GLOBAL}.specs[64].races[1].name`), 'Night Elf');
+  assert.equal(lua.evaluate(L, `${DATA_GLOBAL}.specs[64].races[1].id`), 4);
 });
 
 test('the data addon copies the Interface value of the installed addon and is written whole', async () => {

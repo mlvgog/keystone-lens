@@ -17,6 +17,7 @@ for _, name in ipairs({
   "SetFrameLevel", "SetFrameStrata", "SetHeight", "SetItemByID", "SetJustifyH", "SetMovable", "SetClampedToScreen",
   "SetPoint", "SetScrollChild", "SetSize", "SetTexture", "SetWidth", "StartMoving", "StopMovingOrSizing", "UnlockHighlight",
   "SetToplevel", "SetStatusBarTexture", "SetStatusBarColor", "SetColorTexture", "SetBackdropColor", "SetJustifyV",
+  "SetHighlightTexture",
 }) do
   Widget[name] = noop
 end
@@ -28,6 +29,10 @@ local function newWidget(kind, parent)
   end
   return w
 end
+
+function Widget:SetAtlas(atlas) self.atlas = atlas end
+function Widget:GetParent() return self.parent end
+function Widget:SetSpellByID(id) self.spellID = id end
 
 function Widget:SetText(text)
   self.text = text
@@ -175,7 +180,7 @@ Settings = {
 -- ---------------------------------------------------------------- the player (tests change __player)
 
 __player = {
-  name = "Fjäll", realm = "Tarren Mill", region = 3, classFile = "MAGE", classID = 8, race = "Human", raceFile = "Human",
+  name = "Fjäll", realm = "Tarren Mill", region = 3, classFile = "MAGE", classID = 8, race = "Human", raceFile = "Human", raceID = 1, sex = 2,
   level = 90, specID = 64, ilvl = 289.44,
   items = {}, -- [slot] = link
   configID = 1001,
@@ -189,7 +194,8 @@ function UnitName() return __player.name end
 function GetRealmName() return __player.realm end
 function GetCurrentRegion() return __player.region end
 function UnitClass() return "Mage", __player.classFile, __player.classID end
-function UnitRace() return __player.race, __player.raceFile end
+function UnitRace() return __player.race, __player.raceFile, __player.raceID end
+function UnitSex() return __player.sex end
 function UnitLevel() return __player.level end
 function GetAverageItemLevel() return __player.ilvl, __player.ilvl end
 function GetSpecialization() return 1 end
@@ -230,7 +236,27 @@ C_Traits = {
   GetEntryInfo = function(_, entryID) return { definitionID = entryID } end,
   GetDefinitionInfo = function(id) return { overrideName = "Entry " .. id } end,
 }
-C_Spell = { GetSpellName = function() return nil end, GetSpellTexture = function(id) return 1000 + id end }
+C_Spell = {
+  GetSpellName = function() return nil end,
+  GetSpellTexture = function(id) return 1000 + id end,
+  -- Spells the game knows (others return nil, as for spells not loaded yet).
+  GetSpellInfo = function(id) return __spells[id] end,
+  IsSpellPassive = function(id) return __spells[id] ~= nil and __spells[id].passive == true end,
+}
+__spells = {
+  [58984] = { name = "Horgonblick", iconID = 132089, spellID = 58984 },
+  [20582] = { name = "Schnelligkeit", iconID = 132150, spellID = 20582, passive = true },
+}
+-- Race names in the game's language (German here, to see they are used) and atlases the game has.
+C_CreatureInfo = {
+  GetRaceInfo = function(id)
+    local races = { [1] = { "Mensch", "Human" }, [3] = { "Zwerg", "Dwarf" }, [4] = { "Nachtelf", "NightElf" }, [24] = { "Pandaren", "Pandaren" } }
+    local r = races[id]
+    return r and { raceName = r[1], clientFileString = r[2], raceID = id } or nil
+  end,
+}
+__atlases = { ["raceicon128-nightelf-male"] = true, ["raceicon-dwarf-male"] = true }
+C_Texture = { GetAtlasInfo = function(name) return __atlases[name] and { width = 128, height = 128 } or nil end }
 
 -- ---------------------------------------------------------------- window, items and stats
 

@@ -86,11 +86,13 @@ test('top-runs page is reduced to run ids and rosters', () => {
                 name: 'Kush',
                 class: { slug: 'rogue' },
                 spec: { id: SUB },
+                race: { id: 4, name: 'Night Elf', slug: 'night-elf', faction: 'alliance' },
                 realm: { name: 'Tarren Mill', slug: 'tarren-mill' },
                 region: { slug: 'eu' },
               },
             },
             { character: null },
+            { character: { id: 8, name: 'Vex', spec: { id: SUB }, realm: { name: 'Draenor', slug: 'draenor' }, region: { slug: 'eu' } } },
           ],
         },
       },
@@ -104,7 +106,10 @@ test('top-runs page is reduced to run ids and rosters', () => {
       level: 24,
       score: 547.2,
       completedAt: '2026-10-19T09:59:03.000Z',
-      roster: [{ characterId: 7, name: 'Kush', classSlug: 'rogue', specId: SUB, realm: 'Tarren Mill', realmSlug: 'tarren-mill', region: 'eu' }],
+      roster: [
+        { characterId: 7, name: 'Kush', classSlug: 'rogue', specId: SUB, realm: 'Tarren Mill', realmSlug: 'tarren-mill', region: 'eu', race: { id: 4, name: 'Night Elf' } },
+        { characterId: 8, name: 'Vex', classSlug: null, specId: SUB, realm: 'Draenor', realmSlug: 'draenor', region: 'eu', race: null },
+      ],
     },
   ]);
 });
@@ -115,7 +120,12 @@ test('profile gives spec scores, best and recent keys', () => {
     mythic_plus_scores_by_season: [{ season: 'season-mn-2', segments: { spec_2: { score: 4296.6, color: '#ff8000' } } }],
     mythic_plus_best_runs: [key(1)],
     mythic_plus_recent_runs: [key(2), {}],
+    race: 'Dark Iron Dwarf',
+    faction: 'alliance',
   });
+  assert.equal(p.race, 'Dark Iron Dwarf');
+  assert.equal(p.faction, 'alliance');
+  assert.equal(parseMythicPlusProfile({}).race, null);
   assert.deepEqual(p.bestRuns.map((r) => r.id), [1]);
   assert.deepEqual(p.recentRuns, [{ id: 2, zoneId: 1, level: 20, score: 400, completedAt: '2026-10-01T00:00:00Z' }]);
   assert.deepEqual(specScore(p.segments, 2), { score: 4296.6, color: '#ff8000' });

@@ -7,6 +7,7 @@ const talentTrees = require('./sources/talentTrees');
 const itemData = require('./sources/itemData');
 const wowhead = require('./sources/wowhead');
 const raiderio = require('./sources/raiderio');
+const { raceOf } = require('./races');
 const { characterStatProfile } = require('./gearSummary');
 const { gemLabel } = require('./raid');
 
@@ -102,6 +103,7 @@ async function importSimcCharacter(text, { loadout = 0, signal } = {}) {
     realmSlug: simc.realmSlug,
     region: simc.region,
     className: simc.className,
+    race: raceOf({ name: simc.race })?.name || null,
     activeSpecName: tree.specName,
     itemLevel: averageItemLevel(items),
     profileUrl: simc.region && simc.realmSlug ? raiderio.profileUrl({ region: simc.region, realmSlug: simc.realmSlug, name: simc.name }) : null,

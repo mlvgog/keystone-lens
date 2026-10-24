@@ -9,6 +9,7 @@ const { buildCandidates, mostRecentCandidate, findMember, maxVersion, selectRun 
 const { createDiscovery, poolTarget, rankByScore, specIndexOf } = require('./discovery');
 const { heroSubTrees, variantKeyOf, gearItems } = require('./aggregate');
 const { classifySource } = require('./itemInfo');
+const { raceOf } = require('./races');
 
 const PHASES = [
   { name: 'Loading talent data', weight: 3 },
@@ -19,7 +20,7 @@ const PHASES = [
   { name: 'Building report', weight: 4 },
 ];
 
-const SESSION_VERSION = 6;
+const SESSION_VERSION = 7; // 7: players' races, meta.classId
 const RECENT_PROBES = 10;
 const ARMORY_LOCALE = { us: 'en-us', eu: 'en-gb', kr: 'ko-kr', tw: 'zh-tw' };
 
@@ -274,8 +275,10 @@ async function analyze(opts, { signal, onProgress, force = false, allowStale = f
       if (err.name === 'AbortError') throw err;
     }
     const { score, color } = raiderio.specScore(profile.segments, specIndex);
+    // The profile has the character's race now; the top-runs roster is the fallback.
+    const race = raceOf({ name: profile.race }) || raceOf(player.race || {});
     return {
-      player: { ...player, score, scoreColor: color },
+      player: { ...player, score, scoreColor: color, race: race?.key || null },
       candidates: buildCandidates([...profile.bestRuns, ...player.foundRuns], profile.recentRuns),
       versions: [],
     };
@@ -368,6 +371,7 @@ async function analyze(opts, { signal, onProgress, force = false, allowStale = f
       classSlug,
       specSlug,
       specId,
+      classId: tree.classId ?? null,
       color,
       specIcon,
       region,
@@ -388,6 +392,7 @@ async function analyze(opts, { signal, onProgress, force = false, allowStale = f
       realmSlug: player.realmSlug,
       region: player.region,
       characterId: player.characterId,
+      race: player.race || null,
       score: player.score,
       scoreColor: player.scoreColor,
       links: linksFor(player),

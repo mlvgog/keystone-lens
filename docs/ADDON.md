@@ -6,7 +6,7 @@
 
 | Direction | What | Where |
 |---|---|---|
-| App → game | One record per spec: pick rates, choice splits, popular builds (with their talents and import strings), gear, enchants and gems by game ID, stat profile, per-dungeon talents and builds | `Interface/AddOns/KeystoneLens_Data/Data.lua`, a separate addon folder the app writes, loaded at login or `/reload` |
+| App → game | One record per spec: pick rates, choice splits, popular builds (with their talents and import strings), gear, enchants and gems by game ID, stat profile, races with their racial spells for the spec's class, per-dungeon talents and builds | `Interface/AddOns/KeystoneLens_Data/Data.lua`, a separate addon folder the app writes, loaded at login or `/reload` |
 | Game → app | Your character as SimulationCraft-style text (talent strings, saved loadouts, equipped items), plus name, realm, region, spec and item level | `WTF/Account/<account>/SavedVariables/KeystoneLens.lua`, written by the game at logout or `/reload` |
 
 **Keeping the addon itself up to date.** The app carries the addon (`resources/addon/KeystoneLens`). Settings → Game addon installs it and writes a marker file, `.installed-by-keystone-lens`, into the copy. Each time the app starts, and each time you click Rescan, it compares that copy's files with its own (`wow.addonFingerprint`). If it carries a newer build, it replaces the copy, even when the version number is the same. Copies without the marker (installed by hand or from CurseForge) are never replaced on their own. Settings and a banner offer the update for those instead. The app never replaces a newer version than its own. **Reinstall addon** forces a fresh copy.
@@ -15,7 +15,9 @@ The data folder is separate from the addon folder so that a CurseForge update of
 
 **What the app sends.** Every Mythic+ analysis you open becomes the record of its spec, replacing any older one. In the background, the app also refreshes the specs of the characters the addon saved, when their data is over a day old or misses dungeons. It does them one at a time and pauses while you run your own searches. Warcraft Logs data (Damage tab, Raid mode) is never written to disk, so it never reaches the addon.
 
-**Data format.** `KeystoneLensAppData = { schema = 1, source = "app", app = "<version>", time = <unix>, specs = { [specID] = record } }`. The record is documented at the top of `src/main/addonExport.js`. The addon ignores data whose `schema` is newer than it understands, and says so. Change `SCHEMA` in both `addonExport.js` and `Data.lua` when the format changes incompatibly.
+**Data format.** `KeystoneLensAppData = { schema = 1, source = "app", app = "<version>", time = <unix>, specs = { [specID] = record } }`. The record is documented at the top of `src/main/addonExport.js`. The addon ignores data whose `schema` is newer than it understands, and says so. Change `SCHEMA` in both `addonExport.js` and `Data.lua` when the format changes incompatibly. Fields that are only added (like `races`, from app 1.2.0) keep the schema: older addons ignore them, and the addon handles records without them.
+
+**Races.** The app gets each player's race from raider.io. It adds every race's racial spells for the spec's class from SimulationCraft's game data (`src/main/races.js`). The addon shows the race names in the game's language (`C_CreatureInfo.GetRaceInfo`), the game's race portraits when it has them, and the spells' own names, icons and tooltips.
 
 ## Files
 
@@ -27,6 +29,7 @@ The data folder is separate from the addon folder so that a CurseForge update of
 | `Character.lua` | Saves your character for the app (SimulationCraft format, read by `src/main/simc.js`) |
 | `Talents.lua` | Pick rates and frames on Blizzard's talent window (or a compared build's changes), and the switch in its title row |
 | `Gear.lua` | The Overview tab: character pane with the top players' gear, slot flyouts, stat bars |
+| `Races.lua` | The Overview's "Popular races" strip and the flyout with a race's racial abilities |
 | `Builds.lua` | The side pane with the popular builds, their differences from yours, Copy and Show on talents |
 | `Panel.lua` | The `/kl` window: spec and dungeon menus, Overview and Info tabs, the copy box |
 | `Tooltips.lua` | The popularity line on item tooltips |
@@ -78,9 +81,10 @@ The stand-in API can't prove that Blizzard's frames behave as expected. Before a
    - Copy shows the string, which imports through Loadouts → Import.
    - **Show on talents** opens the talent window if the game has loaded it this session (otherwise it asks you to press N). It frames take (green), drop (red) and change (yellow). The "Build N" button in the window's title row goes back to pick rates.
    - **After using it, apply a talent change: there must be no "Interface action failed because of an AddOn".**
-6. **Item tooltips.** Hovering a popular trinket shows "Keystone Lens: 42% of the top 50 …".
-7. **Back to the app.** Log out or `/reload`, then open Compare with my character in the app. The character is listed under "From the game addon" and loads.
-8. **Errors.** Use `/console scriptErrors 1`, or BugSack, and expect no Lua errors, also in combat and in a key.
+6. **Races.** The Overview's bottom row shows up to five race portraits with their %. Your race is ticked, and "+N" lists the rest. The row must not overlap the weapon slots. Clicking a race opens the flyout of its racials, with "Passive" on passives and the game's tooltip on hover. A click elsewhere closes it. Check a Blood Elf: only your class's Arcane Torrent is listed. Portraits that the game lacks fall back to a spell icon.
+7. **Item tooltips.** Hovering a popular trinket shows "Keystone Lens: 42% of the top 50 …".
+8. **Back to the app.** Log out or `/reload`, then open Compare with my character in the app. The character is listed under "From the game addon" and loads.
+9. **Errors.** Use `/console scriptErrors 1`, or BugSack, and expect no Lua errors, also in combat and in a key.
 
 ## Publishing on CurseForge
 
@@ -105,6 +109,7 @@ Keep the `## Interface` line current with the live game (`/dump select(4, GetBui
 > - Pick rates of the top players on every talent, with choice splits. Popular talents you skip and rare ones you take are framed.
 > - The popular builds per dungeon, which one is closest to yours, and their import strings.
 > - The most used gear, enchants and gems per slot, with yours marked, and their secondary stats next to yours.
+> - The races they play, with each race's racial abilities for your class.
 > - Item tooltips that say how many top players use an item.
 > - Switch to the dungeon of your keystone in one click.
 >

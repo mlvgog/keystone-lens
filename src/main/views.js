@@ -4,6 +4,7 @@ const { aggregateTalents, aggregateGear, variantKeyOf } = require('./aggregate')
 const { clusterBuilds, buildDiffs } = require('./builds');
 const { statProfile, summarizeGear } = require('./gearSummary');
 const history = require('./history');
+const { raceByKey } = require('./races');
 
 /** The key a player is represented by: their overall pick, or their key in one dungeon. */
 function dataFor(player, dungeon) {
@@ -15,6 +16,28 @@ function samplePlayers(session, dungeon) {
 }
 
 const toAgg = (x) => ({ name: x.p.name, talents: x.d.talents, items: x.d.items });
+
+/**
+ * How many of the players play each race: { list: [{ key, name, faction, count, share }], unknown }.
+ * null in raid mode (Warcraft Logs has no races).
+ */
+function raceSummary(entries, meta) {
+  if (meta.mode === 'raid') return null;
+  const counts = new Map();
+  let unknown = 0;
+  for (const { p } of entries) {
+    const race = p.race ? raceByKey(p.race) : null;
+    if (!race) unknown++;
+    else counts.set(race.key, (counts.get(race.key) || 0) + 1);
+  }
+  const list = [...counts]
+    .map(([key, count]) => {
+      const r = raceByKey(key);
+      return { key, name: r.name, faction: r.faction, count, share: entries.length ? count / entries.length : 0 };
+    })
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  return { list, unknown };
+}
 
 function normalizeFilters(filters = {}) {
   return {
@@ -85,6 +108,7 @@ async function buildView(session, filters, deps = {}) {
     realm: p.realm,
     realmSlug: p.realmSlug,
     region: p.region,
+    race: p.race ? raceByKey(p.race)?.name || null : null,
     score: p.score,
     scoreColor: p.scoreColor,
     links: p.links,
@@ -109,6 +133,7 @@ async function buildView(session, filters, deps = {}) {
     gear,
     gearSummary: summarizeGear(agg, session.itemInfo || {}, session.itemSources || {}),
     statProfile: statProfile(agg, session.itemInfo || {}),
+    races: raceSummary(filtered, meta),
     avgItemLevel: filtered.length ? filtered.reduce((s, x) => s + (x.d.itemLevel || 0), 0) / filtered.length : 0,
     fallbackCount: filtered.filter((x) => x.d.fallback).length,
     players,

@@ -16,7 +16,8 @@ globals = {
 
 -- Game API and Blizzard UI the addon reads.
 read_globals = {
-  "C_AddOns", "C_ChallengeMode", "C_ClassTalents", "C_Item", "C_MythicPlus", "C_Spell", "C_Timer", "C_Traits",
+  "C_AddOns", "C_ChallengeMode", "C_ClassTalents", "C_CreatureInfo", "C_Item", "C_MythicPlus", "C_Spell", "C_Texture",
+  "C_Timer", "C_Traits", "UnitSex",
   "CreateFrame", "Enum", "EventUtil", "GameTooltip", "GameTooltip_Hide", "GetAverageItemLevel", "GetCombatRating",
   "GetCurrentRegion", "GetInventoryItemID", "GetInventoryItemLink", "GetRealmName", "GetSpecialization",
   "GetSpecializationInfo", "GetSpecializationInfoByID", "InCombatLockdown", "ItemRefTooltip", "PlayerSpellsFrame",

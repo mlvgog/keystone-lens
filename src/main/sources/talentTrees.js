@@ -373,4 +373,4 @@ async function getTalentData({ signal, force } = {}) {
   return (inMemory = trees);
 }
 
-module.exports = { getTalentData, parseCsv, parseSimcTraits, parseSimcSubTrees, buildTrees, iconName };
+module.exports = { getTalentData, parseCsv, parseSimcTraits, parseSimcSubTrees, buildTrees, iconName, getRowsById, iconNames };

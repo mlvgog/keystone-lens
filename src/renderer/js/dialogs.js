@@ -23,7 +23,8 @@ export function modal(title, body, { width = 460, onClose } = {}) {
     onClose?.();
   };
   const onKey = (e) => {
-    if (e.key === 'Escape') close();
+    const top = [...document.querySelectorAll('.modal-overlay')].at(-1);
+    if (e.key === 'Escape' && top === overlay) close();
   };
   const overlay = el(
     'div.modal-overlay',
@@ -281,6 +282,56 @@ function formatBytes(n) {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
+const WCL_CLIENTS_URL = 'https://www.warcraftlogs.com/api/clients/';
+
+/**
+ * Shown before the Warcraft Logs features are turned on: what they add, and why they need the
+ * user's own API client. `onConfirm` runs on "Turn on".
+ */
+export function wclIntroDialog({ onConfirm }) {
+  const turnOn = el('button.wow-btn', 'Turn on');
+  const dlg = modal(
+    'Warcraft Logs features',
+    el(
+      'div.dialog-form.wcl-intro',
+      el('p', 'Turning this on adds two features that use data from Warcraft Logs:'),
+      el(
+        'ul',
+        el('li', el('b', 'Damage tab: '), 'how much damage (or healing) this spec does per dungeon and key level, and how your own logged runs compare.'),
+        el('li', el('b', 'Raid mode: '), 'the top logged kills of a spec on every boss of the current raid, with their talents and gear.')
+      ),
+      el('div.wow-header', 'Why you need your own API key'),
+      el(
+        'p',
+        'Warcraft Logs only shares its data with registered API clients, and every client may only make a limited number of requests per hour. ',
+        'One key built into the app would be shared by everyone and run out within minutes, so each player uses their own. It is free and takes about two minutes.'
+      ),
+      el('div.wow-header', 'How to get one'),
+      el(
+        'ol',
+        el('li', 'Log in on warcraftlogs.com and open ', el('b', 'API Clients'), ' (the link below).'),
+        el('li', 'Create a client: any name (for example "Keystone Lens"), redirect URL ', el('code', 'http://localhost'), '. Leave “Public client” unticked.'),
+        el('li', 'Paste its client ID and client secret here, in Settings → Warcraft Logs, and click Save & test.')
+      ),
+      el('p.faint.small', 'Your client ID and secret are stored only on this PC (the secret encrypted for your Windows account) and only sent to warcraftlogs.com. Warcraft Logs data is never saved to disk. You can turn this off again at any time.'),
+      el(
+        'div.dialog-buttons',
+        el('button.link-btn', { onclick: () => window.api.openExternal(WCL_CLIENTS_URL) }, 'Open Warcraft Logs API clients'),
+        el('span.spacer'),
+        el('button.wow-btn', { onclick: () => dlg.close() }, 'Cancel'),
+        turnOn
+      )
+    ),
+    { width: 520 }
+  );
+  turnOn.addEventListener('click', () => {
+    dlg.close();
+    onConfirm();
+  });
+  turnOn.focus();
+  return dlg;
+}
+
 /** Settings window. `onChanged(settings, { localeChanged })` runs after every change. */
 export async function settingsDialog({ onChanged }) {
   const { settings, locales, version } = await window.api.getSettings();
@@ -326,7 +377,10 @@ export async function settingsDialog({ onChanged }) {
   region.addEventListener('change', () => save({ defaultRegion: region.value }));
   size.addEventListener('change', () => save({ defaultSize: Number(size.value) }));
 
-  // Warcraft Logs API client (for damage / healing numbers). The secret is never sent back here.
+  // Warcraft Logs (optional): the Damage tab and Raid mode. They need the user's own API client,
+  // so they stay off until turned on here. The secret is never sent back here.
+  const wclToggle = el('input', { type: 'checkbox' });
+  wclToggle.checked = !!settings.wclEnabled;
   const wclId = el('input.wow-input', { placeholder: 'Client ID', value: settings.wclClientId || '' });
   const wclSecret = el('input.wow-input', { type: 'password', placeholder: settings.wclHasSecret ? '•••••••• (saved)' : 'Client secret' });
   const wclStatus = el('div.dialog-status');
@@ -335,7 +389,7 @@ export async function settingsDialog({ onChanged }) {
     wclStatus.textContent = text;
   };
   setWclStatus(
-    settings.wclClientId && settings.wclHasSecret ? 'Saved. Use “Save & test” to check the connection.' : 'Needed for damage and healing numbers.'
+    settings.wclClientId && settings.wclHasSecret ? 'Saved. Use “Save & test” to check the connection.' : 'Enter your client ID and secret, then Save & test.'
   );
   const testWcl = async () => {
     setWclStatus('Connecting to Warcraft Logs…');
@@ -363,13 +417,49 @@ export async function settingsDialog({ onChanged }) {
     wclId.value = '';
     wclSecret.placeholder = 'Client secret';
     setWclStatus('Removed.');
+    showWcl();
   });
   wclSecret.addEventListener('keydown', (e) => e.key === 'Enter' && wclSave.click());
   const wclLink = el(
     'button.link-btn',
-    { onclick: () => window.api.openExternal('https://www.warcraftlogs.com/api/clients/') },
+    { onclick: () => window.api.openExternal(WCL_CLIENTS_URL) },
     'Get a free API client'
   );
+  const wclRows = [
+    el('label', 'Client ID', wclId),
+    el('label', 'Client secret', wclSecret),
+    wclStatus,
+    el('p.faint.small', 'Stored only on this PC (the secret encrypted for your Windows account) and only sent to warcraftlogs.com. Warcraft Logs data is never saved to disk.'),
+  ];
+  const wclOffNote = el('p.faint.small');
+  const wclButtons = el('div.dialog-buttons', wclRemove, wclSave);
+  const showWcl = () => {
+    const on = wclToggle.checked;
+    const saved = !!(settings.wclClientId || settings.wclHasSecret);
+    for (const n of wclRows) n.hidden = !on;
+    wclLink.hidden = !on;
+    wclSave.hidden = !on;
+    wclButtons.hidden = !on && !saved; // Remove stays reachable while a client is saved
+    wclOffNote.hidden = on;
+    wclOffNote.textContent = `Off: the Damage tab and Raid mode are hidden, and nothing is sent to Warcraft Logs.${saved ? ' Your saved API client is kept until you remove it.' : ''}`;
+  };
+  wclToggle.addEventListener('change', async () => {
+    if (!wclToggle.checked) {
+      await save({ wclEnabled: false });
+      showWcl();
+      return;
+    }
+    wclToggle.checked = false; // on only after the explanation
+    wclIntroDialog({
+      onConfirm: async () => {
+        wclToggle.checked = true;
+        await save({ wclEnabled: true });
+        showWcl();
+        wclId.focus();
+      },
+    });
+  });
+  showWcl();
 
   // Updates (see src/main/updater.js).
   const updates = el(
@@ -429,12 +519,11 @@ export async function settingsDialog({ onChanged }) {
       el('div.setting-row', el('span', 'Cache: ', cacheLine), clearBtn),
       el('p.faint.small', 'Key snapshots are kept forever because they never change; everything else refreshes automatically. Your trend history and settings are not affected.'),
       el('div.dialog-sep'),
-      el('div.setting-row', el('div.wow-header', 'Warcraft Logs'), wclLink),
-      el('label', 'Client ID', wclId),
-      el('label', 'Client secret', wclSecret),
-      wclStatus,
-      el('div.dialog-buttons', wclRemove, wclSave),
-      el('p.faint.small', 'Stored only on this PC (the secret encrypted for your Windows account) and only sent to warcraftlogs.com. Warcraft Logs data is never saved to disk.'),
+      el('div.setting-row', el('div.wow-header', 'Warcraft Logs (optional)'), wclLink),
+      el('label.check-row', wclToggle, el('span', 'Damage numbers and Raid mode (needs your own Warcraft Logs API client)')),
+      ...wclRows,
+      wclOffNote,
+      wclButtons,
       el('div.dialog-sep'),
       addon.node,
       el('div.dialog-sep'),

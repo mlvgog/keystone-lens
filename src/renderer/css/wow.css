@@ -2449,3 +2449,100 @@ textarea.wow-textarea:focus {
 .stat-order.you .you-label {
   color: #8fd3ff;
 }
+
+/* ------------------------------------------------------------------ races (Gear overview) and the racials menu */
+.stat-row.race-row {
+  grid-template-columns: 150px 1fr 44px 30px;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 3px 4px;
+  margin: 0 -4px;
+}
+.stat-row.race-row:hover,
+.stat-row.race-row:focus-visible,
+.stat-row.race-row.open {
+  background: rgba(255, 209, 0, 0.08);
+  outline: none;
+}
+.f-alliance { color: #7fb2ff; }
+.f-horde { color: #ff7f6e; }
+.f-both { color: #e8e2cf; }
+.stat-bar i.r-alliance { background: linear-gradient(180deg, #8fbfff, #2a5fb8); }
+.stat-bar i.r-horde { background: linear-gradient(180deg, #ff9d8a, #b8301f); }
+.stat-bar i.r-both { background: linear-gradient(180deg, #e8d9a8, #8a7440); }
+.you-tag {
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  color: #0d0b08;
+  background: #8fd3ff;
+  vertical-align: 1px;
+}
+.racials-menu {
+  position: fixed;
+  z-index: 600; /* over the page, under tooltips (1000) */
+  width: 290px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  font-size: 13px;
+}
+.racials-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 15px;
+}
+.racials-head .faction {
+  font-size: 11px;
+}
+.racial-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.racial-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: #e8e2cf;
+}
+.racial-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.racial-icon {
+  border: 1px solid #000;
+  box-shadow: 0 0 0 1px #4a3b1f;
+  flex: 0 0 auto;
+}
+
+/* ------------------------------------------------------------------ Warcraft Logs intro (Settings) */
+.wcl-intro ul,
+.wcl-intro ol {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.45;
+  font-size: 13px;
+}
+.wcl-intro li + li {
+  margin-top: 4px;
+}
+.wcl-intro b {
+  color: var(--gold-soft);
+  font-weight: normal;
+}
+.wcl-intro code {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.wcl-intro .dialog-buttons {
+  align-items: center;
+  margin-top: 4px;
+}

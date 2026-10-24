@@ -26,6 +26,7 @@ function createDiscovery({ dungeons, specId, fetchPage }) {
       realm: m.realm,
       realmSlug: m.realmSlug,
       region: m.region,
+      race: m.race || null,
       foundRuns: [key],
     };
     byId.set(m.characterId, player);

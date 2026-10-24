@@ -56,6 +56,7 @@ function setup({ characters = [], installed = true, wowPath = true, managed = fa
       calls.dungeons.push(zoneId);
       s.dungeonsLoaded.push(zoneId);
     },
+    racials: async (classId) => ({ nightelf: [{ id: 58984, name: `Shadowmeld (class ${classId})` }] }),
     findWowFolder: async () => retail,
     setTimeout: (fn, ms) => (timers.push({ fn, ms }), timers.length),
     clearTimeout: () => {},
@@ -74,6 +75,7 @@ test('an analysed spec is written to the data addon and kept for later', async (
   lua.run(L, data);
   assert.equal(lua.evaluate(L, 'KeystoneLensAppData.specs[64].spec'), 'Frost');
   assert.equal(lua.evaluate(L, 'KeystoneLensAppData.app'), '1.2.0');
+  assert.equal(lua.evaluate(L, 'KeystoneLensAppData.specs[64].races[1].spells[1].name'), 'Shadowmeld (class 8)');
 
   const stored = JSON.parse(fs.readFileSync(path.join(userData, 'addon-data.json'), 'utf8'));
   assert.deepEqual(Object.keys(stored.specs), ['64']);
