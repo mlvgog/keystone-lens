@@ -92,8 +92,19 @@ test('your talents are compared with the popular builds', async () => {
 
   const verdict = (node) => addon.evaluate(L, `__ns.NodeVerdict(__ns:GetSpecData(64).talents[${node}], __ns.GetMyPicks(), ${node}, 0.75, 0.25)`);
   assert.equal(verdict(1), null, 'popular and picked');
+
+  // A talent the game grants for free (the first node of a tree, the hero tree's first node):
+  // you have it (activeRank) without spending a point (ranksPurchased). Not "skipped", and left
+  // out of the build comparison like the app leaves it out of builds.
   addon.run(L, '__player.nodes[1].ranksPurchased = 0');
+  assert.equal(verdict(1), null, 'a free talent you have is not skipped');
+  assert.equal(addon.evaluate(L, '__ns.GetMyPicks().granted[1]'), true);
+  assert.equal(addon.evaluate(L, '__ns.GetMyPicks().picks[1]'), null);
+  assert.equal(addon.evaluate(L, '__ns.BuildDistance(__ns.GetMyPicks(), __ns:GetSpecData(64).builds[2])'), 6, 'free nodes stay out of the build comparison (this test data has node 1 in its builds)');
+
+  addon.run(L, '__player.nodes[1].activeRank = 0');
   assert.equal(verdict(1), 'missing', 'everyone takes it, you skip it');
+  assert.equal(addon.evaluate(L, '__ns.GetMyPicks().granted[1]'), null);
   addon.run(L, '__player.nodes[2].activeEntry = { entryID = 22 }');
   assert.equal(verdict(2), 'rare', 'the less common side of a choice');
   addon.run(L, '__player.nodes[6].ranksPurchased = 1');
@@ -201,6 +212,7 @@ test('the talent window shows pick rates and frames the differences', async () =
   const L = addon.loadAddon({ before: [await appData()] });
   addon.run(L, MY_NODES);
   addon.run(L, '__player.nodes[1].ranksPurchased = 0; __player.nodes[1].activeRank = 0');
+  addon.run(L, '__player.nodes[3].ranksPurchased = 0'); // node 3 granted for free (activeRank 2)
   addon.run(L, TALENT_FRAME);
   assert.equal(addon.evaluate(L, '__overlay(1)'), '100%');
   assert.equal(addon.evaluate(L, '__overlay(2)'), '67/33', 'choice nodes in entry order');
@@ -211,6 +223,7 @@ test('the talent window shows pick rates and frames the differences', async () =
   assert.equal(addon.evaluate(L, '__overlay(7)'), null, 'the hero tree selection node gets nothing');
   assert.deepEqual(addon.evaluate(L, '__border(1)'), [1, 0.2, 0.1, 0.95], 'popular talent you skip: red');
   assert.equal(addon.evaluate(L, '__border(2)[4]'), 0, 'nothing to flag');
+  assert.equal(addon.evaluate(L, '__border(3)[4]'), 0, 'a free talent you have: no frame');
 
   // Hovering adds the details to the node's tooltip.
   addon.run(L, 'GameTooltip:SetOwner(__buttons[2]); __buttons[2]:SetTooltipInternal()');

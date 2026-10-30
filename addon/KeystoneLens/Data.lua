@@ -160,8 +160,11 @@ function ns.PlayerSpecID()
 end
 
 --- Your talents in a config (default: the active one), as the data stores builds:
---- { picks = { [nodeID] = rank }, choices = { [nodeID] = entryID }, hero = subTreeID }.
---- Free (granted) nodes and the inactive hero tree are left out.
+--- { picks = { [nodeID] = rank }, choices = { [nodeID] = entryID }, hero = subTreeID,
+---   granted = { [nodeID] = true } }.
+--- Talents the game grants for free (activeRank without ranksPurchased, e.g. the first node of a
+--- tree or of the hero tree) are in `granted`, not in `picks`: builds leave them out too.
+--- The inactive hero tree is left out.
 function ns.GetMyPicks(configID)
   if not (C_ClassTalents and C_Traits) then
     return nil
@@ -171,22 +174,24 @@ function ns.GetMyPicks(configID)
   if not config or not config.treeIDs then
     return nil
   end
-  local picks, choices = {}, {}
+  local picks, choices, granted = {}, {}, {}
   for _, treeID in ipairs(config.treeIDs) do
     for _, nodeID in ipairs(C_Traits.GetTreeNodes(treeID) or {}) do
       local info = C_Traits.GetNodeInfo(configID, nodeID)
-      if info and info.ID and info.ID ~= 0 and info.type ~= NODE_SUBTREE_SELECTION and (info.ranksPurchased or 0) > 0 then
-        if not info.subTreeID or info.subTreeActive then
+      if info and info.ID and info.ID ~= 0 and info.type ~= NODE_SUBTREE_SELECTION and (not info.subTreeID or info.subTreeActive) then
+        if (info.ranksPurchased or 0) > 0 then
           picks[nodeID] = info.activeRank or info.ranksPurchased
           if info.type == NODE_SELECTION and info.activeEntry then
             choices[nodeID] = info.activeEntry.entryID
           end
+        elseif (info.activeRank or 0) > 0 then
+          granted[nodeID] = true
         end
       end
     end
   end
   local hero = C_ClassTalents.GetActiveHeroTalentSpec and C_ClassTalents.GetActiveHeroTalentSpec() or nil
-  return { picks = picks, choices = choices, hero = hero }
+  return { picks = picks, choices = choices, hero = hero, granted = granted }
 end
 
 --- Number of talents where two builds differ (missing, other rank or other choice),
@@ -224,7 +229,11 @@ end
 
 --- How you differ from the top players on one node: "missing" (popular, you skip it),
 --- "rare" (you pick it, few do, or you took the less common choice) or nil.
+--- A talent you get for free is neither: everyone has it.
 function ns.NodeVerdict(stat, mine, nodeID, popular, rare)
+  if mine and mine.granted and mine.granted[nodeID] then
+    return nil
+  end
   local picked = mine and mine.picks[nodeID]
   local p = stat and stat.p or 0
   if picked then
