@@ -208,6 +208,10 @@ Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md), the
 
 Bug reports and ideas are welcome in [Issues](https://github.com/mlvgog/keystone-lens/issues). When reporting a bug, include your version (⚙ Settings → About), the spec and the tab. Never post your Warcraft Logs client secret.
 
+## Support
+
+Keystone Lens is free and stays free. If it helps you and you'd like to say thanks, you can [buy me a coffee on Ko-fi](https://ko-fi.com/gog220748).
+
 ## Disclaimer
 
 Keystone Lens is a free, non-commercial fan project. It is not affiliated with or endorsed by Blizzard Entertainment, raider.io, Wowhead, Warcraft Logs, SimulationCraft or wago.tools. World of Warcraft and Warcraft are trademarks or registered trademarks of Blizzard Entertainment, Inc. in the U.S. and/or other countries. Game data and icons belong to their respective owners.
