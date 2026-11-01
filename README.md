@@ -11,9 +11,11 @@
 
 ![Talent tree with pick rates for the top 50 Subtlety Rogues](docs/screenshots/talents.jpg)
 
+**Website, with download and guide:** <https://mlvgog.github.io/keystone-lens/>
+
 ## Download
 
-Get the latest version from the [**Releases**](https://github.com/mlvgog/keystone-lens/releases) page:
+Get the latest version from the [**website**](https://mlvgog.github.io/keystone-lens/) or the [**Releases**](https://github.com/mlvgog/keystone-lens/releases) page:
 
 | File | What it is |
 |---|---|

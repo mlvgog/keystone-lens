@@ -33,7 +33,8 @@
     "dist": "electron-builder --win nsis portable",
     "dist:installer": "electron-builder --win nsis",
     "dist:portable": "electron-builder --win portable",
-    "icon": "electron scripts/make-icon.js"
+    "icon": "electron scripts/make-icon.js",
+    "site": "node scripts/build-site.js"
   },
   "build": {
     "appId": "com.keystonelens.app",

@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src https://api.github.com; img-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Keystone Lens</title>
+    <meta
+      name="description"
+      content="Free Windows app and game addon that show the talents, builds, gear and races of the top Mythic+ players of any World of Warcraft spec."
+    />
+    <meta name="theme-color" content="#120c06" />
+    <link rel="icon" type="image/png" href="img/icon.png" />
+    <link rel="stylesheet" href="css/site.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Keystone Lens" />
+    <meta property="og:title" content="Keystone Lens: what the best Mythic+ players run" />
+    <meta
+      property="og:description"
+      content="Talent pick rates, popular builds, gear and races of the top Mythic+ players of any spec. Free Windows app with a game addon."
+    />
+    <meta property="og:url" content="https://mlvgog.github.io/keystone-lens/" />
+    <meta property="og:image" content="https://mlvgog.github.io/keystone-lens/img/app/talents.jpg" />
+    <meta property="og:image:width" content="1560" />
+    <meta property="og:image:height" content="980" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script src="js/site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="./"><img src="img/icon.png" alt="" width="34" height="34" />Keystone Lens</a>
+        <nav class="site-nav" aria-label="Main">
+          <a href="#features">Features</a>
+          <a href="#addon">Game addon</a>
+          <a href="guide.html">Guide</a>
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/mlvgog/keystone-lens">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <div class="hero">
+        <div class="wrap">
+          <div>
+            <h1>See what the best Mythic+ players of your spec actually run</h1>
+            <p class="lead">
+              Keystone Lens shows the talents, builds, gear and races of the top Mythic+ players of any spec, in a window
+              that looks like part of the game. Its addon brings the same numbers into World of Warcraft.
+            </p>
+            <div class="download-box">
+              <a class="btn" href="https://github.com/mlvgog/keystone-lens/releases/latest" data-download="setup">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+                Download for Windows
+              </a>
+              <p class="facts"><span data-release="version">The newest version</span> · Windows 10 and 11</p>
+              <p class="alt">
+                No install? Get the <a href="https://github.com/mlvgog/keystone-lens/releases/latest" data-download="portable">portable exe</a>.
+                <a href="https://github.com/mlvgog/keystone-lens/releases/latest" data-release="notes">What's new</a>
+              </p>
+            </div>
+            <ul class="badges">
+              <li>Free and open source</li>
+              <li>No account</li>
+              <li>No ads or tracking</li>
+            </ul>
+          </div>
+          <a class="shot frame" href="img/app/talents.jpg" data-caption="The talent tree with the pick rates of the top 50 Subtlety Rogues.">
+            <img src="img/app/talents.jpg" width="1560" height="980" fetchpriority="high" alt="Keystone Lens showing a talent tree with the percentage of top players who pick each talent" />
+          </a>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <section id="features">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Everything the top players do, in one place</h2>
+            <p>
+              Pick a class and spec. Keystone Lens finds its best players in this season's top keys on raider.io and
+              reads the talents and gear each of them used in their best key on the current patch.
+            </p>
+          </div>
+
+          <div class="feature">
+            <a class="shot frame" href="img/app/talents.jpg" data-caption="Talents: pick rates on the class, hero and spec trees, with the popular builds.">
+              <img src="img/detail/talents.jpg" width="900" height="490" loading="lazy" alt="Popular builds and the class and hero talent trees with pick rates" />
+            </a>
+            <div class="text">
+              <h3>Talents and builds</h3>
+              <ul>
+                <li>The class, hero and spec trees laid out like the game's talent window, with the % of players who pick every talent.</li>
+                <li>Popular builds, grouped from players with nearly the same talents, and how each one differs from the majority.</li>
+                <li><strong>Copy</strong> a build's import string and paste it into the game.</li>
+                <li>Save or copy the tree as an image to share it on Discord.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="feature flip">
+            <a class="shot frame" href="img/app/gear.jpg" data-caption="Gear: stats, enchants, gems, tier pieces and the items used in every slot.">
+              <img src="img/detail/gear.jpg" width="755" height="363" loading="lazy" alt="Secondary-stat priority and the top enchant per slot" />
+            </a>
+            <div class="text">
+              <h3>Gear, stats and races</h3>
+              <ul>
+                <li>The secondary-stat priority, top enchants, gems, embellishments and tier pieces at a glance.</li>
+                <li>The items used in every slot and how many players use each, with exact stats, enchants and gems.</li>
+                <li>Where every item drops: which dungeon, raid boss, crafted or tier.</li>
+                <li>Which races the top players pick. Click a race to see its racial abilities for your class.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="feature">
+            <a class="shot frame" href="img/app/players.jpg" data-caption="Players: every sampled player with their score, key, build and gear.">
+              <img src="img/detail/players.jpg" width="940" height="365" loading="lazy" alt="Table of the top players with score, key, hero tree, build and item level" />
+            </a>
+            <div class="text">
+              <h3>The players behind the numbers</h3>
+              <ul>
+                <li>Every player in the sample with their race, score, key, hero tree, build and item level.</li>
+                <li>Click a player to see their own talent tree and gear, or open them on raider.io, Warcraft Logs and the Armory.</li>
+                <li>Filter everything by dungeon or hero tree, and see how pick rates changed since your last look.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="feature flip">
+            <a class="shot frame" href="img/app/picker.jpg" data-caption="Choose any class and spec, the region and how many players to look at.">
+              <img src="img/detail/picker.jpg" width="900" height="700" loading="lazy" alt="Class and spec picker with region, number of players and key options" />
+            </a>
+            <div class="text">
+              <h3>Any spec, compared with you</h3>
+              <ul>
+                <li>All classes and specs, worldwide or by region, from the top 25, 50 or 100 players.</li>
+                <li>
+                  <strong>Compare with my character:</strong> your talents appear on the tree, with a red ring on popular
+                  talents you skip, and your items show next to the popular ones.
+                </li>
+                <li>Load your character from raider.io, from the SimulationCraft addon, or straight from the Keystone Lens addon.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="divider" />
+
+      <section id="addon">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>The same numbers inside the game</h2>
+            <p>
+              The Keystone Lens addon shows the top players' choices right where you make your own. The app installs it,
+              keeps it up to date, and sends it the data of every spec you look at.
+            </p>
+          </div>
+          <div class="cards">
+            <div class="panel">
+              <h3>On your talent window</h3>
+              <p>
+                The pick rate under every talent. A red frame marks a popular talent you skip, an orange one a rare talent
+                you take. Switch between all dungeons and each dungeon; it starts on the dungeon of your keystone.
+              </p>
+            </div>
+            <div class="panel">
+              <h3>The <code>/kl</code> window</h3>
+              <p>
+                The top players' gear as a character pane, with a tick on items you wear. Their stats next to yours, the
+                races they play, and the popular builds per dungeon with what each changes from yours.
+              </p>
+            </div>
+            <div class="panel">
+              <h3>Tooltips and your characters</h3>
+              <p>
+                Item tooltips say how many top players of your spec use the item. Your characters' talents and gear are
+                saved for the app, so comparing needs no copy and paste.
+              </p>
+            </div>
+          </div>
+          <p class="small dim">
+            The addon has no internet access, like every addon. It reads the data file the app writes, which loads when you
+            log in or type <code>/reload</code>. <a href="guide.html#addon">Setting up the addon</a>
+          </p>
+        </div>
+      </section>
+
+      <hr class="divider" />
+
+      <section id="warcraft-logs">
+        <div class="wrap">
+          <div class="panel">
+            <h2>Optional: damage numbers and raids</h2>
+            <p>
+              With your own free Warcraft Logs API key, Keystone Lens also shows the spec's damage and healing per dungeon
+              and key level, your own logged runs next to them, and <strong>Raid mode</strong>: the talents and gear of the
+              top 100 kills on every boss.
+            </p>
+            <p class="dim">
+              Warcraft Logs doesn't allow keys to be built into open-source apps, so this is off until you turn it on in
+              <strong>⚙ Settings → Warcraft Logs</strong>. Making a key takes about two minutes.
+              <a href="guide.html#warcraft-logs">How to set it up</a>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="privacy">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Safe, private and open</h2>
+          </div>
+          <div class="cards">
+            <div class="panel">
+              <h3>No account, no tracking</h3>
+              <p>
+                Keystone Lens has no server, no login, no ads and no telemetry. Your PC fetches public data straight from
+                raider.io, Wowhead and the game's data, and everything it keeps stays on your PC.
+                <a href="https://github.com/mlvgog/keystone-lens/blob/main/PRIVACY.md">Privacy policy</a>
+              </p>
+            </div>
+            <div class="panel">
+              <h3>Open source</h3>
+              <p>
+                All the code is public under the MIT licence. Every release is built from it by GitHub Actions and comes
+                with SHA-256 checksums, so you can check that your download is the published one.
+              </p>
+            </div>
+            <div class="panel">
+              <h3>Updates itself</h3>
+              <p>
+                The installed app downloads new versions in the background and installs them when you restart it. You can
+                switch that to "Only tell me" or off in <strong>⚙ Settings → Updates</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <hr class="divider" />
+
+      <section id="faq">
+        <div class="wrap faq">
+          <h2>Questions</h2>
+
+          <details>
+            <summary>Windows says "Windows protected your PC". Is that normal?</summary>
+            <div>
+              <p>
+                Yes. The app isn't code-signed yet, so SmartScreen doesn't recognise it. Click <strong>More info</strong>,
+                then <strong>Run anyway</strong>.
+              </p>
+              <p>
+                To check the file first, compare its checksum with <code>SHA256SUMS.txt</code> on the release page:
+                <a href="guide.html#install">how to check a download</a>.
+              </p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Is it free?</summary>
+            <div><p>Yes, completely: no ads, no account, no paid version. It's a fan project and open source.</p></div>
+          </details>
+
+          <details>
+            <summary>Does it work on Mac or Linux?</summary>
+            <div><p>No, only on Windows 10 and 11. The game addon gets its data from the app, so it needs the app too.</p></div>
+          </details>
+
+          <details>
+            <summary>Where does the data come from, and how fresh is it?</summary>
+            <div>
+              <p>
+                From raider.io's list of this season's top keys. The app takes the players of your spec in those keys,
+                ranks them by Mythic+ score, and uses the talents and gear each one had in their best key on the current
+                patch. Item, talent and racial details come from the game's data through Wowhead, SimulationCraft and
+                wago.tools.
+              </p>
+              <p>A search is fetched fresh when it's over an hour old, or when you click <strong>Refresh</strong>.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Does it change anything in the game?</summary>
+            <div>
+              <p>
+                No. The app never touches the running game. It only writes the addon and its data file into your
+                <code>Interface\AddOns</code> folder, the way an addon manager does, and reads the characters the addon
+                saves. The addon only displays information; it doesn't automate anything.
+              </p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Do I need a Warcraft Logs key?</summary>
+            <div>
+              <p>
+                No. Talents, builds, gear, races, players and the game addon all work without one. A key is only needed
+                for the optional damage numbers and Raid mode.
+              </p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Something doesn't work. Where do I report it?</summary>
+            <div>
+              <p>
+                In <a href="https://github.com/mlvgog/keystone-lens/issues">GitHub Issues</a>. Mention your version
+                (⚙ Settings → About), the spec and what you clicked. Never post your Warcraft Logs secret.
+              </p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="download" class="cta">
+        <div class="wrap">
+          <h2>Try it on your spec</h2>
+          <div class="download-box">
+            <a class="btn" href="https://github.com/mlvgog/keystone-lens/releases/latest" data-download="setup">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+              Download for Windows
+            </a>
+            <p class="facts"><span data-release="version">The newest version</span> · Windows 10 and 11</p>
+            <p class="release-summary" data-release="summary" hidden></p>
+            <p class="alt">New to it? The <a href="guide.html">guide</a> walks you through your first search.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <nav aria-label="Footer">
+          <a href="guide.html">Guide</a>
+          <a href="https://github.com/mlvgog/keystone-lens/releases">All releases</a>
+          <a href="https://github.com/mlvgog/keystone-lens">Source code</a>
+          <a href="https://github.com/mlvgog/keystone-lens/blob/main/PRIVACY.md">Privacy</a>
+          <a href="https://github.com/mlvgog/keystone-lens/issues">Report a bug</a>
+        </nav>
+        <p>
+          Keystone Lens is a free, non-commercial fan project under the MIT licence. It is not affiliated with or endorsed
+          by Blizzard Entertainment, raider.io, Wowhead, Warcraft Logs, SimulationCraft or wago.tools. World of Warcraft
+          and Warcraft are trademarks or registered trademarks of Blizzard Entertainment, Inc. in the U.S. and/or other
+          countries. Game data and icons belong to their respective owners.
+        </p>
+      </div>
+    </footer>
+
+    <dialog id="viewer" aria-label="Screenshot">
+      <figure>
+        <img alt="" />
+        <figcaption></figcaption>
+      </figure>
+    </dialog>
+  </body>
+</html>
