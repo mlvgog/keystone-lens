@@ -243,6 +243,23 @@ kbd {
   background: linear-gradient(180deg, #3a2d1c, #1c160d);
 }
 
+.download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.btn.small {
+  min-height: 36px;
+  font-size: 0.95rem;
+  padding: 4px 14px;
+  gap: 8px;
+}
+.btn.small svg {
+  width: 18px;
+  height: 18px;
+}
+
 .download-box {
   display: flex;
   flex-direction: column;
@@ -637,6 +654,12 @@ dialog#viewer figcaption {
   }
   .download-box {
     align-items: stretch;
+  }
+  .download-actions {
+    align-items: flex-start;
+  }
+  .btn.small {
+    width: auto;
   }
   section {
     padding: 36px 0;

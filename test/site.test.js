@@ -97,6 +97,10 @@ test('every page links to the Ko-fi page, and only there, for donations', () => 
     for (const a of links) assert.match(a, /href="https:\/\/ko-fi\.com\/gog220748"/, `${page}: ${a}`);
   }
   assert.match(read('index.html'), /<div class="support" id="support">/);
+  // A small Support button sits next to the top download button.
+  const hero = /<div class="download-actions">([\s\S]*?)<\/div>/.exec(read('index.html'))?.[1] || '';
+  assert.match(hero, /data-download="setup"/);
+  assert.match(hero, /data-donate/);
 });
 
 const asset = (name, size = 1000) => ({
