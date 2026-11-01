@@ -39,6 +39,9 @@ end
 
 --- How one node compares with a build: "add", "drop", "change" or nil.
 function ns.BuildVerdict(build, mine, nodeID)
+  if mine and ns.IsNotATalentChoice(mine, nodeID) then
+    return nil
+  end
   local theirs = build.picks and build.picks[nodeID]
   local yours = mine and mine.picks[nodeID]
   if theirs and not yours then

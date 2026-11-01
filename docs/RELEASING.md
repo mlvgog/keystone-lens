@@ -45,6 +45,14 @@ The app replaces an addon copy it installed whenever its own copy differs, even 
 
 **Never publish a GitHub release that isn't an app release as the repository's latest release.** The app's updater takes the latest GitHub release as the newest app version, and fails if it has no `latest.yml`. The addon workflow therefore uploads to CurseForge and keeps its zip as a workflow artifact, never as a GitHub release.
 
+## The website
+
+The website, <https://mlvgog.github.io/keystone-lens/>, is in `site/`. The Website workflow ([`pages.yml`](../.github/workflows/pages.yml)) publishes it on GitHub Pages whenever `site/`, `docs/screenshots/` or the app icon change on `main`. It can also be run by hand from the **Actions** tab. GitHub Pages must be set to deploy from Actions, once: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+A release needs no change to the website. Its download buttons ask GitHub for the newest release when the page opens, and link to that release's installer and portable exe. Under the button, the site shows the **first line of the release notes**, so start `docs/release-notes/<tag>.md` with a one-line summary in bold, as before. If GitHub doesn't answer, the buttons open the newest release page instead.
+
+To preview the site, run `npm run site` and open `_site\index.html`. `npm test` checks its links, images and download buttons.
+
 ## Building locally
 
 ```bat

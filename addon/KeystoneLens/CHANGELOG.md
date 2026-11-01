@@ -1,5 +1,10 @@
 # Keystone Lens addon
 
+## 1.1.2
+
+- **Fixed:** every popular build listed one talent more than you have, shown as "+ Talent" with a number (for example "+ Talent 99842"). It was the choice of hero tree, which is not a talent you take or skip. Your own build now shows as "your build", and "Your talents are closest to Build 1 (1 differ)" reads "Your talents are Build 1." when they match.
+- **Fixed:** the menus that open from a race or a gear slot were see-through, so the window's text showed through them. They now have a solid background.
+
 ## 1.1.1
 
 - **Fixed:** talents the game gives you for free (the first talent of a tree, such as Cloak of Shadows, and the first talent of your hero tree) were framed red as "most top players take this and you don't". They no longer get a frame.

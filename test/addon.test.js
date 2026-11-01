@@ -86,6 +86,12 @@ test('your talents are compared with the popular builds', async () => {
   assert.deepEqual(mine.choices, { 2: 21 });
   assert.equal(mine.hero, 40);
   assert.deepEqual(addon.evaluate(L, '{ __ns.ClosestBuild(__ns:GetSpecData(64).builds, __ns.GetMyPicks()) }'), [1, 0]);
+  // The builds list node 9, which picks the hero tree, among their talents (as talent strings
+  // do). It is not a talent you take or skip: `hero` covers it.
+  assert.equal(addon.evaluate(L, '__ns:GetSpecData(64).builds[1].picks[9]'), 1);
+  assert.equal(addon.evaluate(L, '__ns.GetMyPicks().selection[9]'), true);
+  assert.equal(addon.evaluate(L, '#__ns.BuildDiff(__ns.GetMyPicks(), __ns:GetSpecData(64).builds[1])'), 0);
+  assert.equal(addon.evaluate(L, '__ns.BuildVerdict(__ns:GetSpecData(64).builds[1], __ns.GetMyPicks(), 9)'), null);
 
   // Build 2 differs in the choice, the rank of node 3, node 6 and the hero node.
   assert.equal(addon.evaluate(L, '__ns.BuildDistance(__ns.GetMyPicks(), __ns:GetSpecData(64).builds[2])'), 5);
@@ -100,7 +106,8 @@ test('your talents are compared with the popular builds', async () => {
   assert.equal(verdict(1), null, 'a free talent you have is not skipped');
   assert.equal(addon.evaluate(L, '__ns.GetMyPicks().granted[1]'), true);
   assert.equal(addon.evaluate(L, '__ns.GetMyPicks().picks[1]'), null);
-  assert.equal(addon.evaluate(L, '__ns.BuildDistance(__ns.GetMyPicks(), __ns:GetSpecData(64).builds[2])'), 6, 'free nodes stay out of the build comparison (this test data has node 1 in its builds)');
+  assert.equal(addon.evaluate(L, '__ns.BuildDistance(__ns.GetMyPicks(), __ns:GetSpecData(64).builds[2])'), 5, 'a talent you get for free is no difference, even where a build lists it (node 1 here)');
+  assert.equal(addon.evaluate(L, '#__ns.BuildDiff(__ns.GetMyPicks(), __ns:GetSpecData(64).builds[1])'), 0);
 
   addon.run(L, '__player.nodes[1].activeRank = 0');
   assert.equal(verdict(1), 'missing', 'everyone takes it, you skip it');
