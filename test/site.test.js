@@ -90,6 +90,15 @@ test('download links work before the script runs: they point at the newest relea
   assert.match(read('index.html'), /data-download="portable"/);
 });
 
+test('every page links to the Ko-fi page, and only there, for donations', () => {
+  for (const page of pages) {
+    const links = tags(read(page), 'a').filter((t) => /\sdata-donate\b/.test(t));
+    assert.ok(links.length >= 1, `${page} has no donate link`);
+    for (const a of links) assert.match(a, /href="https:\/\/ko-fi\.com\/gog220748"/, `${page}: ${a}`);
+  }
+  assert.match(read('index.html'), /<div class="support" id="support">/);
+});
+
 const asset = (name, size = 1000) => ({
   name,
   size,

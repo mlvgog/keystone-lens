@@ -462,6 +462,16 @@ section {
   margin-right: auto;
 }
 
+.support {
+  max-width: 560px;
+  margin: 40px auto 0;
+  padding-top: 28px;
+  border-top: 1px solid var(--panel-border);
+}
+.support p {
+  color: var(--text-dim);
+}
+
 /* ------------------------------------------------------------------ guide */
 .guide {
   display: grid;
