@@ -189,13 +189,14 @@ local function createFlyout(parent)
   flyout:SetWidth(FLYOUT_WIDTH)
   flyout:SetFrameStrata("DIALOG")
   flyout:EnableMouse(true)
+  -- A solid fill: the tooltip background texture lets the window behind show through.
   flyout:SetBackdrop({
-    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    bgFile = "Interface\\Buttons\\WHITE8X8",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
     tile = true, tileSize = 16, edgeSize = 16,
     insets = { left = 4, right = 4, top = 4, bottom = 4 },
   })
-  flyout:SetBackdropColor(0.04, 0.04, 0.06, 0.97)
+  flyout:SetBackdropColor(0.04, 0.04, 0.06, 1)
   flyout:SetBackdropBorderColor(0.8, 0.65, 0.3, 1)
   flyout.title = flyout:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   flyout.title:SetPoint("TOPLEFT", 10, -10)

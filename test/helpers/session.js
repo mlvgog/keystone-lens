@@ -19,6 +19,18 @@ const tree = {
     { id: 4, type: 'single', subTreeId: 40, entryNode: true, maxRanks: 1, entries: [{ id: 40, icon: 'a' }] },
     { id: 5, type: 'single', subTreeId: 41, entryNode: true, maxRanks: 1, entries: [{ id: 50, icon: 'b' }] },
   ],
+  // The node that picks the hero tree; decodeLoadout lists it among every player's talents.
+  subTreeNodes: [
+    {
+      id: 9,
+      type: 'subtree',
+      maxRanks: 1,
+      entries: [
+        { id: 90, type: 'subtree', name: 'Alpha', traitSubTreeId: 40 },
+        { id: 91, type: 'subtree', name: 'Beta', traitSubTreeId: 41 },
+      ],
+    },
+  ],
   subTrees: [
     { id: 40, name: 'Alpha', icon: 'a' },
     { id: 41, name: 'Beta', icon: 'b' },
@@ -37,7 +49,7 @@ function entry(picks, hero, items, loadoutText) {
     talents: {
       heroSubTreeId: hero,
       loadoutText,
-      nodes: [...picks, [hero === 40 ? 4 : 5, hero === 40 ? 40 : 50, 1]].map(([nodeId, entryId, rank]) => ({ nodeId, entryId, rank, granted: false })),
+      nodes: [...picks, [hero === 40 ? 4 : 5, hero === 40 ? 40 : 50, 1], [9, hero === 40 ? 90 : 91, 1]].map(([nodeId, entryId, rank]) => ({ nodeId, entryId, rank, granted: false })),
     },
     items,
     itemLevel: 330,

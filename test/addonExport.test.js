@@ -27,7 +27,8 @@ test('a spec record holds pick rates, builds, gear, enchants and gems', async ()
 
   // Builds: the medoid's picks and choices, so the addon can compare them with yours.
   assert.equal(r.builds.length, 2);
-  assert.deepEqual(r.builds[0], { n: 4, p: 0.667, hero: 40, str: 'STRA', picks: { 1: 1, 2: 1, 3: 2, 4: 1 }, choices: { 2: 21 } });
+  // Node 9 picks the hero tree: talent strings list it, so builds have it too (the addon skips it).
+  assert.deepEqual(r.builds[0], { n: 4, p: 0.667, hero: 40, str: 'STRA', picks: { 1: 1, 2: 1, 3: 2, 4: 1, 9: 1 }, choices: { 2: 21 } });
   assert.equal(r.builds[1].str, 'STRB');
 
   // Gear: rings combined, counted once per player; enchants and gems by game ID.

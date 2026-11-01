@@ -161,9 +161,11 @@ end
 
 --- Your talents in a config (default: the active one), as the data stores builds:
 --- { picks = { [nodeID] = rank }, choices = { [nodeID] = entryID }, hero = subTreeID,
----   granted = { [nodeID] = true } }.
+---   granted = { [nodeID] = true }, selection = { [nodeID] = true } }.
 --- Talents the game grants for free (activeRank without ranksPurchased, e.g. the first node of a
 --- tree or of the hero tree) are in `granted`, not in `picks`: builds leave them out too.
+--- The node that picks the hero tree is in `selection`: `hero` says which one you took. Builds
+--- list it among their talents, but it is never a difference (see ns.IsNotATalentChoice).
 --- The inactive hero tree is left out.
 function ns.GetMyPicks(configID)
   if not (C_ClassTalents and C_Traits) then
@@ -174,11 +176,13 @@ function ns.GetMyPicks(configID)
   if not config or not config.treeIDs then
     return nil
   end
-  local picks, choices, granted = {}, {}, {}
+  local picks, choices, granted, selection = {}, {}, {}, {}
   for _, treeID in ipairs(config.treeIDs) do
     for _, nodeID in ipairs(C_Traits.GetTreeNodes(treeID) or {}) do
       local info = C_Traits.GetNodeInfo(configID, nodeID)
-      if info and info.ID and info.ID ~= 0 and info.type ~= NODE_SUBTREE_SELECTION and (not info.subTreeID or info.subTreeActive) then
+      if info and info.ID and info.ID ~= 0 and info.type == NODE_SUBTREE_SELECTION then
+        selection[nodeID] = true
+      elseif info and info.ID and info.ID ~= 0 and (not info.subTreeID or info.subTreeActive) then
         if (info.ranksPurchased or 0) > 0 then
           picks[nodeID] = info.activeRank or info.ranksPurchased
           if info.type == NODE_SELECTION and info.activeEntry then
@@ -191,11 +195,17 @@ function ns.GetMyPicks(configID)
     end
   end
   local hero = C_ClassTalents.GetActiveHeroTalentSpec and C_ClassTalents.GetActiveHeroTalentSpec() or nil
-  return { picks = picks, choices = choices, hero = hero, granted = granted }
+  return { picks = picks, choices = choices, hero = hero, granted = granted, selection = selection }
 end
 
---- Number of talents where two builds differ (missing, other rank or other choice),
---- counted as the app counts them when it groups builds.
+--- True for a node of a build that is not a talent you could take or skip: the hero tree's
+--- selection node (the build's `hero` says which tree it takes), or a talent you get for free.
+function ns.IsNotATalentChoice(mine, nodeID)
+  return (mine.selection and mine.selection[nodeID]) or (mine.granted and mine.granted[nodeID]) or false
+end
+
+--- Number of talents where your build `a` (from ns.GetMyPicks) and a build `b` differ (missing,
+--- other rank or other choice), counted as the app counts them when it groups builds.
 function ns.BuildDistance(a, b)
   local d = 0
   local seen = {}
@@ -206,7 +216,7 @@ function ns.BuildDistance(a, b)
     end
   end
   for nodeID in pairs(b.picks or {}) do
-    if not seen[nodeID] then
+    if not seen[nodeID] and not ns.IsNotATalentChoice(a, nodeID) then
       d = d + 1
     end
   end
@@ -318,7 +328,7 @@ function ns.BuildDiff(mine, build, skip)
   local picks = build.picks or {}
   local choices = build.choices or {}
   for nodeID, rank in pairs(picks) do
-    if not (skip and skip[nodeID]) then
+    if not (skip and skip[nodeID]) and not ns.IsNotATalentChoice(mine, nodeID) then
       local myRank = mine.picks[nodeID]
       if not myRank then
         list[#list + 1] = { kind = "add", nodeID = nodeID, entryID = choices[nodeID], rank = rank }
