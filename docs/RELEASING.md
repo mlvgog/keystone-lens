@@ -37,6 +37,31 @@ So every release must contain `latest.yml` and `KeystoneLens-Setup-<version>.exe
 
 To review a release before it goes out, set `draft: true` in `release.yml` and publish the draft from **Releases** yourself. The updater ignores drafts, so nobody gets it until you publish.
 
+## Development portable builds
+
+Use [Dev portable release](../.github/workflows/dev-release.yml) to share a Windows
+test exe before merging a fix. Push a unique `dev-*` tag on the commit to test:
+
+```sh
+git tag dev-settings-close-1 <commit-or-branch>
+git push origin dev-settings-close-1
+```
+
+The tagged commit must contain `dev-release.yml`. Once the workflow is on `main`,
+you can also use **Actions → Dev portable release → Run workflow**, selecting a
+branch that contains the workflow. Manual runs create a unique dev tag.
+
+The workflow runs the tests and builds only the x64 Windows portable exe, with a
+version such as `1.2.2-dev.1.1` embedded through a build override. It leaves the
+source version and lockfile unchanged. Each build gets a GitHub **prerelease**
+containing the exe, its SHA-256 checksum and the exact commit in the release notes.
+The files are also available as a workflow artifact.
+
+Download the exe directly from that prerelease to test it. It is unsigned like
+the current stable builds. Stable updates and the website's latest-release
+downloads ignore prereleases; no installer or stable updater metadata is published.
+This workflow does not publish the game addon separately.
+
 ## Releasing the game addon
 
 The game addon has its own version (`## Version` in `addon/KeystoneLens/KeystoneLens.toc`) and its own tags, `addon-v<version>`. See [ADDON.md](ADDON.md#publishing-on-curseforge). The app also carries a copy of the addon, so each app release brings the addon version that is in the repository at that tag.

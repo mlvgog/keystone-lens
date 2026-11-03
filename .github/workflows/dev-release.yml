@@ -1,0 +1,81 @@
+name: Dev portable release
+
+# Dev tags deliberately do not match the stable release workflow's v* pattern.
+on:
+  push:
+    tags: ['dev-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+      - name: Identify the test build
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version="$(node -p "require('./package.json').version.split('-')[0]")-dev.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          tag="dev-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [ "$EVENT_NAME" = push ]; then tag="$REF_NAME"; fi
+          echo "DEV_VERSION=$version" >> "$GITHUB_ENV"
+          echo "DEV_TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Build portable exe only
+        shell: bash
+        run: npx electron-builder --win portable --x64 --publish never --config.extraMetadata.version="$DEV_VERSION"
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Checksum and build details
+        shell: bash
+        run: |
+          exe="KeystoneLens-Portable-${DEV_VERSION}.exe"
+          test -s "dist/$exe"
+          (cd dist && sha256sum "$exe" > SHA256SUMS.txt)
+          cat > dist/DEV-RELEASE.md <<EOF
+          Development build for manual testing; not a stable release.
+
+          Version: ${DEV_VERSION}
+          Commit: ${GITHUB_SHA}
+          Workflow run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
+          Download ${exe} below. This unsigned portable exe needs no installation.
+          Stable app updates and the website's latest download ignore this prerelease.
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dev-portable-${{ env.DEV_VERSION }}
+          if-no-files-found: error
+          path: |
+            dist/KeystoneLens-Portable-*.exe
+            dist/SHA256SUMS.txt
+            dist/DEV-RELEASE.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.DEV_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Dev portable ${{ env.DEV_VERSION }}
+          prerelease: true
+          make_latest: false
+          body_path: dist/DEV-RELEASE.md
+          fail_on_unmatched_files: true
+          files: |
+            dist/KeystoneLens-Portable-*.exe
+            dist/SHA256SUMS.txt
