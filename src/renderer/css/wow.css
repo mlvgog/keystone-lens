@@ -1886,6 +1886,8 @@ table.ov-table {
 
 /* ------------------------------------------------------------------ dialogs */
 .modal-overlay {
+  /* Tall dialogs overlap the title bar; keep its native drag region from stealing clicks. */
+  -webkit-app-region: no-drag;
   position: fixed;
   inset: 0;
   z-index: 500;
