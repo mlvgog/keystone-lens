@@ -5,7 +5,9 @@ const stats = require('./stats');
 const { version, homepage } = require('../../package.json');
 
 // Identifies the app to the APIs it uses (with a link once the project is public).
-const USER_AGENT = `KeystoneLens/${version} (desktop app${homepage ? `; +${homepage}` : ''})`;
+// The weekly addon data build says so instead of "desktop app" (see configure()).
+const userAgent = (context) => `KeystoneLens/${version} (${context}${homepage ? `; +${homepage}` : ''})`;
+let USER_AGENT = userAgent('desktop app');
 
 function abortError() {
   const err = new Error('Cancelled');
@@ -62,6 +64,18 @@ class Limiter {
 const HOST_CONCURRENCY = { 'raider.io': 8 };
 const REQUEST_TIMEOUT_MS = 60000;
 const limiters = new Map();
+/**
+ * For scripts other than the app (scripts/build-addon-data.js): how requests identify themselves
+ * (`context`, e.g. "addon data build") and parallel requests per host (`concurrency`).
+ */
+function configure({ context, concurrency } = {}) {
+  if (context) USER_AGENT = userAgent(context);
+  for (const [host, n] of Object.entries(concurrency || {})) {
+    HOST_CONCURRENCY[host] = n;
+    limiters.delete(host);
+  }
+}
+
 function limiterFor(url) {
   const host = new URL(url).host;
   if (!limiters.has(host)) limiters.set(host, new Limiter(HOST_CONCURRENCY[host] || 4));
@@ -123,4 +137,4 @@ async function request(url, { signal, retries = 5, as = 'json', method = 'GET', 
 const fetchJson = (url, opts = {}) => request(url, { ...opts, as: 'json' });
 const fetchText = (url, opts = {}) => request(url, { ...opts, as: 'text' });
 
-module.exports = { request, fetchJson, fetchText, sleep, abortError, Limiter };
+module.exports = { request, fetchJson, fetchText, sleep, abortError, Limiter, configure, userAgentString: () => USER_AGENT };

@@ -62,7 +62,8 @@
         "filter": [
           "**/*",
           "!.pkgmeta",
-          "!.release/**"
+          "!.release/**",
+          "!KeystoneLens_DB/**"
         ]
       }
     ],

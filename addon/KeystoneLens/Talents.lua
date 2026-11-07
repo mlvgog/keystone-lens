@@ -195,7 +195,7 @@ local function updateBar(rec, specID, buildIndex)
     bar.dungeon:Hide()
   elseif not rec then
     local name = specID and select(2, GetSpecializationInfoByID(specID)) or nil
-    bar.info = "No data for " .. (name or "this spec") .. " yet. Look at it in the Keystone Lens app, then /reload."
+    bar.info = "No data for " .. (name or "this spec") .. " yet. Update the addon, or look at it in the Keystone Lens app, then /reload."
     bar.dungeon:Hide()
   else
     bar.dungeon:SetText(zoneID and ns.DungeonName(rec, zoneID) or "All dungeons")

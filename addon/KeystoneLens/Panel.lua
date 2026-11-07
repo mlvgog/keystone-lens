@@ -100,13 +100,13 @@ local function createInfo(parent)
   s:text("GameFontNormal"):SetText("This data")
   info.data = s:text(nil, 4)
   info.data2 = s:text(nil, 2)
-  s:text("GameFontNormal", 16):SetText("Fresh data for your specs")
+  s:text("GameFontNormal", 16):SetText("Where the data comes from")
   s:text(nil, 4):SetText(
-    "The free Keystone Lens desktop app for Windows finds the top Mythic+ players of each spec and writes their talents and gear for this addon. It keeps your characters' specs up to date, and has more: filters, inspecting players, damage and raid data. New data loads when you log in or /reload."
+    "The addon comes with data for every spec: the top 50 Mythic+ players world-wide, renewed every week with an addon update. The free Keystone Lens desktop app for Windows can add fresher data whenever you look at a spec, for any region or number of players, and keeps your characters' specs up to date. Per spec, the newest data is shown. New data loads when you log in or /reload."
   )
   local link = CreateFrame("Button", nil, info, "UIPanelButtonTemplate")
   link:SetSize(220, 22)
-  link:SetText("github.com/mlvgog/keystone-lens")
+  link:SetText("mlvgog.github.io/keystone-lens")
   link:SetScript("OnClick", function()
     ns.ShowCopyBox(ns.APP_URL, "Keystone Lens app")
   end)
@@ -122,7 +122,7 @@ local function createInfo(parent)
   s:text("GameFontNormal", 12):SetText("Commands")
   s:text(nil, 4):SetText("/kl: this window · /kl talents · /kl tooltips · /kl status · /kl options")
   s:text("GameFontNormal", 16):SetText("Sources")
-  s:text("GameFontDisableSmall", 4):SetText("Players, keys, talents, gear and races: raider.io (via the app). Racial abilities: the game's data via SimulationCraft. Not affiliated with Blizzard Entertainment or raider.io.")
+  s:text("GameFontDisableSmall", 4):SetText("Players, keys, talents, gear and races: Raider.IO (raider.io), in the weekly data or through the app. Racial abilities: the game's data via SimulationCraft. Not affiliated with Blizzard Entertainment or Raider.IO.")
   return info
 end
 
@@ -139,7 +139,7 @@ local function renderInfo(info, rec, source)
   info.data:SetText(string.format("Top %d %s %ss · %s%s%s", rec.sample or 0, rec.spec or "", rec.class or "", region,
     rec.season and (" · " .. rec.season) or "", rec.patch and (" · patch " .. rec.patch) or ""))
   info.data2:SetText(string.format("%s %s. %d of %d dungeons have their own builds.",
-    source == "app" and "From the Keystone Lens app," or "Bundled with the addon,", ns.Ago(rec.time),
+    source == "app" and "From the Keystone Lens app," or "Weekly data from the addon,", ns.Ago(rec.time),
     #ns.LoadedDungeons(rec), #(rec.dungeonList or {})))
 end
 
@@ -212,7 +212,7 @@ function ns:RenderPanel()
     ns.RenderGear(panel.overview, rec, view.specID)
     if not rec then
       panel.overview.empty:SetText(ns:NeedsUpdate() and "The data was written for a newer version of this addon. Update Keystone Lens."
-        or "No data yet.\n\nThis addon shows data from the free Keystone Lens desktop app: look at your spec in the app (or let it keep your characters' specs fresh), then /reload. See the Info tab.")
+        or "No data for this spec yet.\n\nThe weekly data comes with addon updates, for example through CurseForge. The free Keystone Lens desktop app can also add data for any spec you look at there; then /reload. See the Info tab.")
     end
   else
     renderInfo(panel.info, rec, spec and spec.source)
@@ -220,7 +220,8 @@ function ns:RenderPanel()
   self:RenderBuilds(view.specID, rec)
 
   if rec then
-    panel.footer:SetText((spec.source == "app" and "From the Keystone Lens app · " or "Bundled data · ") .. ns.Ago(rec.time) .. " · /reload loads new data")
+    panel.footer:SetText(spec.source == "app" and ("From the Keystone Lens app · " .. ns.Ago(rec.time) .. " · /reload loads new data")
+      or ("Weekly data · " .. ns.Ago(rec.time) .. " · from Raider.IO"))
   else
     panel.footer:SetText("")
   end
@@ -376,7 +377,7 @@ ns:On("TRAIT_CONFIG_UPDATED", renderSoon)
 ns:Listen("PRINT_STATUS", function()
   local specs = ns:AvailableSpecs()
   if #specs == 0 then
-    ns.Print("no data loaded. Get it from the Keystone Lens app (" .. ns.APP_URL .. ").")
+    ns.Print("no data loaded. Update the addon for the weekly data, or use the Keystone Lens app (" .. ns.APP_URL .. ").")
     return
   end
   for _, s in ipairs(specs) do

@@ -2,6 +2,10 @@
 node_modules/
 dist/
 _site/
+# Weekly addon data build (scripts/build-addon-data.js)
+build/
+.addon-data-cache/
+addon/KeystoneLens/KeystoneLens_DB/
 addon/KeystoneLens/.release/
 
 # Logs

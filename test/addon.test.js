@@ -481,10 +481,31 @@ test('the Info tab says where the data comes from; without data the window expla
 
   const empty = addon.loadAddon();
   addon.run(empty, '__ns:TogglePanel()');
-  assert.match(addon.evaluate(empty, 'KeystoneLensFrame.overview.empty.text'), /^No data yet\.[\s\S]*Keystone Lens desktop app/);
+  assert.match(addon.evaluate(empty, 'KeystoneLensFrame.overview.empty.text'), /^No data for this spec yet\.[\s\S]*weekly data[\s\S]*Keystone Lens desktop app/);
   assert.equal(addon.evaluate(empty, 'KeystoneLensFrame.overview.slots[1].shown'), false);
   assert.deepEqual(addon.errors(L), []);
   assert.deepEqual(addon.errors(empty), []);
+});
+
+test('with only the weekly data from CurseForge the addon works, and newer app data wins', async () => {
+  const weekly = async (time) => dataFileText({ 64: { ...(await specRecord(session())), time } }, { bundle: true, now: time * 1000 });
+  const L = addon.loadAddon({ before: [await weekly(1000)] });
+  addon.run(L, MY_NODES);
+  addon.run(L, MY_GEAR);
+  assert.equal(addon.evaluate(L, 'select(2, __ns:GetSpecData(64))'), 'bundle');
+  addon.run(L, '__ns:TogglePanel(); __runTimers()');
+  assert.match(addon.evaluate(L, 'KeystoneLensFrame.footer.text'), /^Weekly data · .* · from Raider\.IO$/);
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.overview.slots[1].shown'), true, 'the gear pane is filled');
+  addon.run(L, '__texts = {}; KeystoneLensFrame.tabs[2].scripts.OnClick()');
+  assert.ok(addon.evaluate(L, '__texts').some((t) => /^Weekly data from the addon, /.test(t)));
+  assert.deepEqual(addon.errors(L), []);
+
+  // The app's data for the same spec is newer: it wins. Older app data does not.
+  const app = (time) => appData({ time });
+  const both = addon.loadAddon({ before: [await app(2000), await weekly(1000)] });
+  assert.equal(addon.evaluate(both, 'select(2, __ns:GetSpecData(64))'), 'app');
+  const stale = addon.loadAddon({ before: [await app(500), await weekly(1000)] });
+  assert.equal(addon.evaluate(stale, 'select(2, __ns:GetSpecData(64))'), 'bundle');
 });
 
 test('the addon is plain Lua 5.1, as WoW runs it', (t) => {

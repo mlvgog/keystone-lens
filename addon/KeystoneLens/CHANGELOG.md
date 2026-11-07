@@ -1,5 +1,11 @@
 # Keystone Lens addon
 
+## 1.2.0
+
+- **Works on its own.** The addon now comes with data for every spec: the top 50 Mythic+ players world-wide, with every dungeon, from Raider.IO's public data. It is renewed every week with an addon update. You no longer need the desktop app to use it.
+- **The app still adds more.** With the free Keystone Lens app, the specs you look at get fresh data whenever you want, for any region and number of players. Per spec, the addon shows whichever data is newer.
+- The window's footer and Info tab say which data you see and how old it is.
+
 ## 1.1.2
 
 - **Fixed:** every popular build listed one talent more than you have, shown as "+ Talent" with a number (for example "+ Talent 99842"). It was the choice of hero tree, which is not a talent you take or skip. Your own build now shows as "your build", and "Your talents are closest to Build 1 (1 differ)" reads "Your talents are Build 1." when they match.
