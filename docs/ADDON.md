@@ -122,7 +122,7 @@ That run checks the tag against `## Version` and publishes at once; the weekly r
 **Things to know:**
 - GitHub pauses scheduled workflows in a public repository after 60 days without a commit, and emails you first. Re-enable it under Actions → Addon, or push any commit.
 - The cache of key snapshots is about 1 GB. GitHub drops caches unused for 7 days, so a small Sunday run restores it to keep it. If it is lost anyway, the next run fetches every snapshot again, which takes longer and asks Raider.IO more.
-- A run fails, and uploads nothing, when more than 3 specs fail to build.
+- Specs with fewer than 5 players in the season's top keys are left out. Raider.IO lists the top 2,000 keys per dungeon, and in a lopsided season a spec can have only 1–3 players there. For those specs the addon says it has no data; the app can still look at them. A run fails, and uploads nothing, when more than 3 specs fail with an error or fewer than 20 specs could be built.
 
 Keep the `## Interface` line current with the live game (`/dump select(4, GetBuildInfo())` in game). Several values can be listed: `## Interface: 120105, 120200`.
 

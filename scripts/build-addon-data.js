@@ -8,8 +8,13 @@
 //   node scripts/build-addon-data.js [--out <dir>] [--cache <dir>] [--specs 261,262] [--max-missing 3]
 //
 // Players' key snapshots never change and stay in the cache folder, so a weekly run with the
-// previous week's cache mostly fetches new keys. The run fails when more specs fail than
-// --max-missing, so a broken week is never published.
+// previous week's cache mostly fetches new keys.
+//
+// Some specs are hardly played in top keys (raider.io lists the top 2,000 keys per dungeon; in a
+// skewed season a spec can have 1-3 players there). Specs with fewer than MIN_PLAYERS are left
+// out; the addon then says it has no data for them. The run fails, so a broken week is never
+// published, when more specs fail with an error than --max-missing, or fewer than MIN_SPECS
+// specs could be built at all.
 
 const fs = require('fs');
 const path = require('path');
@@ -19,7 +24,8 @@ const TOC = path.join(ROOT, 'addon', 'KeystoneLens', 'KeystoneLens.toc');
 
 const REGION = 'world';
 const SAMPLE_SIZE = 50;
-const MIN_PLAYERS = 10;
+const MIN_PLAYERS = 5;
+const MIN_SPECS = 20;
 
 function defaultDeps() {
   const talentTrees = require('../src/main/sources/talentTrees');
@@ -62,13 +68,14 @@ function specList(classes, only = null) {
  * Build the records and write `<out>/KeystoneLens_DB/{KeystoneLens_DB.toc,Data.lua}`.
  * Returns { dir, records, failed, bytes }.
  */
-async function buildAddonData({ out, only = null, maxMissing = 3, minPlayers = MIN_PLAYERS, deps = defaultDeps(), log = console.log, now = Date.now() } = {}) {
+async function buildAddonData({ out, only = null, maxMissing = 3, minPlayers = MIN_PLAYERS, minSpecs = only ? 1 : MIN_SPECS, deps = defaultDeps(), log = console.log, now = Date.now() } = {}) {
   const { dataFileText, bundleTocText, readTocField, BUNDLE_ADDON } = require('../src/main/addonExport');
   const specs = specList(await deps.classList(), only);
   if (!specs.length) throw new Error(only ? `No spec matches ${only.join(', ')}` : 'No specs found in the talent data');
 
   const records = {};
   const failed = [];
+  const skipped = [];
   for (const [i, opts] of specs.entries()) {
     const label = `${opts.specName} ${opts.className}`;
     const started = Date.now();
@@ -76,7 +83,12 @@ async function buildAddonData({ out, only = null, maxMissing = 3, minPlayers = M
       const { session } = await deps.analyze(opts, {});
       for (const d of session.meta.dungeons || []) await deps.loadDungeon(session, d.id, {});
       const rec = await deps.specRecord(session);
-      if ((rec.sample || 0) < minPlayers) throw new Error(`only ${rec.sample || 0} players`);
+      if ((rec.sample || 0) < minPlayers) {
+        skipped.push({ specId: opts.specId, label, players: rec.sample || 0 });
+        const n = rec.sample || 0;
+        log(`[${i + 1}/${specs.length}] ${label}: left out, only ${n} player${n === 1 ? '' : 's'} in this season's top keys`);
+        continue;
+      }
       records[rec.specId] = rec;
       log(`[${i + 1}/${specs.length}] ${label}: ${rec.sample} players, ${Object.keys(rec.dungeons || {}).length} dungeons (${Math.round((Date.now() - started) / 1000)}s)`);
     } catch (err) {
@@ -87,6 +99,8 @@ async function buildAddonData({ out, only = null, maxMissing = 3, minPlayers = M
   if (failed.length > maxMissing) {
     throw new Error(`${failed.length} specs failed (at most ${maxMissing} may): ${failed.map((f) => f.label).join(', ')}`);
   }
+  const built = Object.keys(records).length;
+  if (built < minSpecs) throw new Error(`Only ${built} specs could be built (at least ${minSpecs} are needed)`);
 
   const interfaceVersion = readTocField(fs.readFileSync(TOC, 'utf8'), 'Interface');
   const date = new Date(now);
@@ -98,7 +112,7 @@ async function buildAddonData({ out, only = null, maxMissing = 3, minPlayers = M
   const data = dataFileText(records, { appVersion, now, bundle: true });
   fs.writeFileSync(path.join(dir, 'Data.lua'), data);
   fs.writeFileSync(path.join(dir, `${BUNDLE_ADDON}.toc`), bundleTocText({ interfaceVersion, version }));
-  return { dir, records, failed, bytes: Buffer.byteLength(data) };
+  return { dir, records, failed, skipped, bytes: Buffer.byteLength(data) };
 }
 
 function parseArgs(argv) {
@@ -134,10 +148,14 @@ async function main() {
   fs.mkdirSync(args.cache, { recursive: true });
   cache.init(args.cache);
   const started = Date.now();
-  const res = await buildAddonData({ out: args.out, only: args.only, maxMissing: args.maxMissing });
-  console.log(`\nWrote ${path.relative(process.cwd(), res.dir)}: ${Object.keys(res.records).length} specs, ${(res.bytes / 1e6).toFixed(2)} MB, ${Math.round((Date.now() - started) / 60000)} min`);
-  if (res.failed.length) console.log(`Missing: ${res.failed.map((f) => f.label).join(', ')}`);
-  console.log(`\nRequests:\n${requestSummary(stats)}`);
+  try {
+    const res = await buildAddonData({ out: args.out, only: args.only, maxMissing: args.maxMissing });
+    console.log(`\nWrote ${path.relative(process.cwd(), res.dir)}: ${Object.keys(res.records).length} specs, ${(res.bytes / 1e6).toFixed(2)} MB, ${Math.round((Date.now() - started) / 60000)} min`);
+    if (res.skipped.length) console.log(`Left out (too few players): ${res.skipped.map((f) => `${f.label} (${f.players})`).join(', ')}`);
+    if (res.failed.length) console.log(`Failed: ${res.failed.map((f) => `${f.label}: ${f.error}`).join(', ')}`);
+  } finally {
+    console.log(`\nRequests:\n${requestSummary(stats)}`);
+  }
 }
 
 if (require.main === module) {
@@ -147,4 +165,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { buildAddonData, specList, parseArgs, REGION, SAMPLE_SIZE };
+module.exports = { buildAddonData, specList, parseArgs, REGION, SAMPLE_SIZE, MIN_PLAYERS, MIN_SPECS };

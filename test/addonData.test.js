@@ -49,7 +49,7 @@ test('every spec is built world-wide from the top 50, with every dungeon', async
   const out = tmp();
   const deps = stubDeps();
   const logs = [];
-  const res = await buildAddonData({ out, deps, minPlayers: 1, log: (l) => logs.push(l), now: Date.UTC(2026, 10, 11, 7) });
+  const res = await buildAddonData({ out, deps, minPlayers: 1, minSpecs: 3, log: (l) => logs.push(l), now: Date.UTC(2026, 10, 11, 7) });
 
   assert.deepEqual(deps.calls.analyze.map((o) => [o.specId, o.region, o.sampleSize, o.since]), [
     [63, 'world', 50, null],
@@ -90,14 +90,33 @@ test('every spec is built world-wide from the top 50, with every dungeon', async
 test('a spec that fails is left out, and too many failures stop the build', async () => {
   const out = tmp();
   const logs = [];
-  const res = await buildAddonData({ out, deps: stubDeps({ fail: [63] }), minPlayers: 1, log: (l) => logs.push(l) });
+  const res = await buildAddonData({ out, deps: stubDeps({ fail: [63] }), minPlayers: 1, minSpecs: 2, log: (l) => logs.push(l) });
   assert.deepEqual(Object.keys(res.records).map(Number), [64, 261]);
   assert.deepEqual(res.failed, [{ specId: 63, label: 'Fire Mage', error: 'raider.io answered 500' }]);
   assert.ok(logs.some((l) => /Fire Mage: FAILED: raider\.io answered 500/.test(l)));
 
-  await assert.rejects(buildAddonData({ out, deps: stubDeps({ fail: [63, 64] }), minPlayers: 1, maxMissing: 1, log: () => {} }), /2 specs failed \(at most 1 may\): Fire Mage, Frost Mage/);
-  // The synthetic session has 6 players: under the minimum, every spec counts as failed.
-  await assert.rejects(buildAddonData({ out, deps: stubDeps(), maxMissing: 2, log: () => {} }), /3 specs failed \(at most 2 may\)/);
+  await assert.rejects(buildAddonData({ out, deps: stubDeps({ fail: [63, 64] }), minPlayers: 1, minSpecs: 1, maxMissing: 1, log: () => {} }), /2 specs failed \(at most 1 may\): Fire Mage, Frost Mage/);
+  fs.rmSync(out, { recursive: true, force: true });
+});
+
+test('specs hardly played in top keys are left out, but a nearly empty week is never published', async () => {
+  const out = tmp();
+  const logs = [];
+  // The synthetic session has 6 players: under a minimum of 10, every spec is left out. That is
+  // the data, not an error, so it doesn't count against --max-missing.
+  const res = await buildAddonData({ out, deps: stubDeps(), minPlayers: 10, minSpecs: 0, maxMissing: 0, log: (l) => logs.push(l) });
+  assert.deepEqual(res.skipped.map((x) => [x.label, x.players]), [['Fire Mage', 6], ['Frost Mage', 6], ['Subtlety Rogue', 6]]);
+  assert.deepEqual(res.failed, []);
+  assert.ok(logs.some((l) => /Fire Mage: left out, only 6 players in this season's top keys/.test(l)));
+
+  // The default minimum is 5 players, so these 6-player specs are built.
+  const ok = await buildAddonData({ out, deps: stubDeps(), minSpecs: 3, log: () => {} });
+  assert.equal(Object.keys(ok.records).length, 3);
+
+  // A full run needs at least 20 specs; a test run with --specs at least one.
+  await assert.rejects(buildAddonData({ out, deps: stubDeps(), log: () => {} }), /Only 3 specs could be built \(at least 20 are needed\)/);
+  await assert.rejects(buildAddonData({ out, only: [64], deps: stubDeps(), minPlayers: 10, log: () => {} }), /Only 0 specs could be built \(at least 1 are needed\)/);
+  assert.equal((await buildAddonData({ out, only: [64], deps: stubDeps(), log: () => {} })).records[64].specId, 64);
   fs.rmSync(out, { recursive: true, force: true });
 });
 
