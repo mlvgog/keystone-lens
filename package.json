@@ -61,7 +61,6 @@
         "to": "addon/KeystoneLens",
         "filter": [
           "**/*",
-          "!.pkgmeta",
           "!.release/**",
           "!KeystoneLens_DB/**"
         ]

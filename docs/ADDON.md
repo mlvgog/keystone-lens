@@ -102,11 +102,11 @@ Without the secret or the variable, every run only builds the zip, which you can
 
 **What a run does:**
 
-1. Lints and tests the addon and the data build.
+1. Lints and tests the addon, the data build and the upload script.
 2. Builds the week's data with `scripts/build-addon-data.js`, using the cache of key snapshots from earlier runs.
-3. Commits the data into the runner's copy as `KeystoneLens/KeystoneLens_DB` and tags that commit `<addon version>-data.<date>`, for example `1.2.0-data.20261111`. Neither leaves the runner.
-4. Packages it with the [BigWigs packager](https://github.com/BigWigsMods/packager). `move-folders` in `.pkgmeta` turns the data into its own `KeystoneLens_DB` folder in the zip, so the `KeystoneLens` folder stays identical to the repository's, and the app recognises it as the same build.
-5. Checks the zip (both folders, nothing hidden), keeps it as an artifact, and uploads it as `KeystoneLens-1.2.0-data.20261111` when it may.
+3. Zips the addon exactly as committed (`git archive`, without hidden files) and the data as its own `KeystoneLens_DB` folder. The `KeystoneLens` folder is identical to the app's copy, so the app sees the same build.
+4. Checks the zip (both folders, nothing else, nothing hidden) and keeps it as an artifact.
+5. When it may, uploads it with `scripts/upload-curseforge.js` as, for example, `1.2.0-data.20261111`: the addon version and the data's date. The upload uses the CurseForge game version for `## Interface` (the newest listed one below it for a patch CurseForge doesn't list yet). The changelog is `CHANGELOG.md`, with a line about the week's data on top.
 
 A manual run uploads only with **Upload to CurseForge** ticked. With **specs** filled in (for example `261,262`), it builds just those specs as a quick test and never uploads.
 
