@@ -10,6 +10,7 @@
 ## AddonCompartmentFuncOnEnter: KeystoneLens_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: KeystoneLens_OnAddonCompartmentLeave
 ## X-Website: https://mlvgog.github.io/keystone-lens/
+## X-Curse-Project-ID: 1790549
 ## X-License: MIT
 
 Core.lua

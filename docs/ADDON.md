@@ -96,9 +96,9 @@ The **Addon** workflow ([`addon.yml`](../.github/workflows/addon.yml)) publishes
 
 1. **Create the project** on <https://authors.curseforge.com> (World of Warcraft → Addons). Name: *Keystone Lens*. License: MIT. Paste the description below. CurseForge reviews new projects before they go public.
 2. **Create an API token** at <https://authors.curseforge.com/#/settings/api-tokens>. Store it as the repository **secret** `CF_API_TOKEN` (GitHub → Settings → Secrets and variables → Actions → Secrets).
-3. **Store the project ID** (on the project page under "About Project") as the repository **variable** `CF_PROJECT_ID` (same page, Variables tab).
+3. The project ID (in the project's URL on the authors portal, or under "About Project" on its public page) is in the `.toc` as `## X-Curse-Project-ID: 1790549`. A repository variable `CF_PROJECT_ID` would override it.
 
-Without the secret or the variable, every run only builds the zip, which you can download from the run as an artifact. To pause uploads, delete the variable.
+Without the secret, every run only builds the zip, which you can download from the run as an artifact. To pause uploads, delete the secret or disable the workflow (Actions → Addon → ⋯ → Disable workflow).
 
 **What a run does:**
 
