@@ -3,7 +3,7 @@ local addonName, ns = ...
 
 ns.name = addonName
 ns.title = "Keystone Lens"
-ns.APP_URL = "https://github.com/mlvgog/keystone-lens"
+ns.APP_URL = "https://mlvgog.github.io/keystone-lens/"
 ns.version = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")) or "?"
 
 local DEFAULTS = {

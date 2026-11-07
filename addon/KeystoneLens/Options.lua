@@ -49,7 +49,7 @@ local function build()
   app:SetPoint("TOPLEFT", options.dataText, "BOTTOMLEFT", 0, -14)
   app:SetWidth(540)
   app:SetJustifyH("LEFT")
-  app:SetText("The data comes from the free Keystone Lens desktop app for Windows (" .. ns.APP_URL .. "). It writes the data for this addon and keeps your characters' specs up to date. New data loads when you log in or /reload.")
+  app:SetText("The addon comes with weekly data from Raider.IO for every spec (top 50 world-wide). The free Keystone Lens desktop app for Windows (" .. ns.APP_URL .. ") can add fresher data, other regions and your characters' specs. New data loads when you log in or /reload.")
 end
 
 options:SetScript("OnShow", function()

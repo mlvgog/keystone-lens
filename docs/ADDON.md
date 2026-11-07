@@ -1,17 +1,18 @@
 # The Keystone Lens game addon
 
-`addon/KeystoneLens` is a World of Warcraft addon that brings the app's Mythic+ data into the game. It has no network access, as no addon does. It reads data the desktop app writes for it, and it saves your characters for the app.
+`addon/KeystoneLens` is a World of Warcraft addon that brings the top players' Mythic+ data into the game. It has no network access, as no addon does. It reads two kinds of data: the **weekly data** that ships with it on CurseForge (`KeystoneLens_DB`), and the data the **desktop app** writes when you have it (`KeystoneLens_Data`). It also saves your characters for the app.
 
 ## How the data gets to the game
 
 | Direction | What | Where |
 |---|---|---|
+| Weekly build → game | One record per spec for every spec (world-wide, top 50, every dungeon), built by the Addon workflow from Raider.IO's API (see [The weekly data](#the-weekly-data)) | `Interface/AddOns/KeystoneLens_DB/Data.lua`, a second folder in the CurseForge zip, as `KeystoneLensBundledData` |
 | App → game | One record per spec: pick rates, choice splits, popular builds (with their talents and import strings), gear, enchants and gems by game ID, stat profile, races with their racial spells for the spec's class, per-dungeon talents and builds | `Interface/AddOns/KeystoneLens_Data/Data.lua`, a separate addon folder the app writes, loaded at login or `/reload` |
 | Game → app | Your character as SimulationCraft-style text (talent strings, saved loadouts, equipped items), plus name, realm, region, spec and item level | `WTF/Account/<account>/SavedVariables/KeystoneLens.lua`, written by the game at logout or `/reload` |
 
 **Keeping the addon itself up to date.** The app carries the addon (`resources/addon/KeystoneLens`). Settings → Game addon installs it and writes a marker file, `.installed-by-keystone-lens`, into the copy. Each time the app starts, and each time you click Rescan, it compares that copy's files with its own (`wow.addonFingerprint`). If it carries a newer build, it replaces the copy, even when the version number is the same. Copies without the marker (installed by hand or from CurseForge) are never replaced on their own. Settings and a banner offer the update for those instead. The app never replaces a newer version than its own. **Reinstall addon** forces a fresh copy.
 
-The data folder is separate from the addon folder so that a CurseForge update of the addon never deletes the data. Its `.toc` copies the `## Interface` value of the installed addon, so the game doesn't list it as out of date.
+Per spec, the addon shows the newer of the weekly record and the app's record. The data folders are separate from the addon folder: a CurseForge update replaces `KeystoneLens` and `KeystoneLens_DB` but never touches the app's `KeystoneLens_Data`, and the app never touches the weekly data. Its `.toc` copies the `## Interface` value of the installed addon, so the game doesn't list it as out of date.
 
 **What the app sends.** Every Mythic+ analysis you open becomes the record of its spec, replacing any older one. In the background, the app also refreshes the specs of the characters the addon saved, when their data is over a day old or misses dungeons. It does them one at a time and pauses while you run your own searches. Warcraft Logs data (Damage tab, Raid mode) is never written to disk, so it never reaches the addon.
 
@@ -41,7 +42,7 @@ The addon has no libraries and no minimap button. It only writes to chat in answ
 
 Blizzard's add-on policy does not allow advertisements in add-ons. The addon therefore mentions the desktop app only where that is plain information, and only in its own UI:
 
-- the data line ("From the Keystone Lens app · 2 hours ago");
+- the data line ("From the Keystone Lens app · 2 hours ago", or "Weekly data · 3 days ago · from Raider.IO");
 - the empty state when there is no data, which explains where data comes from;
 - the About tab and the Settings page, with the project link in a copy box.
 
@@ -85,20 +86,43 @@ The stand-in API can't prove that Blizzard's frames behave as expected. Before a
 7. **Item tooltips.** Hovering a popular trinket shows "Keystone Lens: 42% of the top 50 …".
 8. **Back to the app.** Log out or `/reload`, then open Compare with my character in the app. The character is listed under "From the game addon" and loads.
 9. **Errors.** Use `/console scriptErrors 1`, or BugSack, and expect no Lua errors, also in combat and in a key.
+10. **Weekly data alone.** Unzip the Addon workflow's artifact into `Interface/AddOns` and move `KeystoneLens_Data` away. Every spec has data: the footer says "Weekly data · … · from Raider.IO", and talents, `/kl` and tooltips work for any spec. Move `KeystoneLens_Data` back: the specs the app refreshed since show "From the Keystone Lens app". Check `/run UpdateAddOnMemoryUsage() print(GetAddOnMemoryUsage("KeystoneLens_DB"))` stays reasonable (a few MB).
 
 ## Publishing on CurseForge
 
+The **Addon** workflow ([`addon.yml`](../.github/workflows/addon.yml)) publishes the addon with fresh data every **Wednesday** at 07:23 UTC, after the US and EU weekly resets. It also runs when you push an `addon-v*` tag, and by hand from the Actions tab.
+
+**One-time setup:**
+
 1. **Create the project** on <https://authors.curseforge.com> (World of Warcraft → Addons). Name: *Keystone Lens*. License: MIT. Paste the description below. CurseForge reviews new projects before they go public.
-2. **Add the project ID** to `addon/KeystoneLens/KeystoneLens.toc`: `## X-Curse-Project-ID: <id>` (it is on the project page under "About Project").
-3. **Create an API token** at <https://authors.curseforge.com/#/settings/api-tokens>. Store it as the repository secret `CF_API_TOKEN` (GitHub → Settings → Secrets and variables → Actions).
-4. **Release.** Set `## Version` in the `.toc` and add the changes to `addon/KeystoneLens/CHANGELOG.md`. Commit, then tag and push:
+2. **Create an API token** at <https://authors.curseforge.com/#/settings/api-tokens>. Store it as the repository **secret** `CF_API_TOKEN` (GitHub → Settings → Secrets and variables → Actions → Secrets).
+3. **Store the project ID** (on the project page under "About Project") as the repository **variable** `CF_PROJECT_ID` (same page, Variables tab).
 
-   ```bat
-   git tag addon-v1.0.0
-   git push origin addon-v1.0.0
-   ```
+Without the secret or the variable, every run only builds the zip, which you can download from the run as an artifact. To pause uploads, delete the variable.
 
-   The **Addon** workflow lints and tests the addon, checks the tag against `## Version`, packages it with the [BigWigs packager](https://github.com/BigWigsMods/packager), and uploads it to CurseForge. The zip is also kept as a workflow artifact. Without the secret or the project ID it only builds the zip.
+**What a run does:**
+
+1. Lints and tests the addon, the data build and the upload script.
+2. Builds the week's data with `scripts/build-addon-data.js`, using the cache of key snapshots from earlier runs.
+3. Zips the addon exactly as committed (`git archive`, without hidden files) and the data as its own `KeystoneLens_DB` folder. The `KeystoneLens` folder is identical to the app's copy, so the app sees the same build.
+4. Checks the zip (both folders, nothing else, nothing hidden) and keeps it as an artifact.
+5. When it may, uploads it with `scripts/upload-curseforge.js` as, for example, `1.2.0-data.20261111`: the addon version and the data's date. The upload uses the CurseForge game version for `## Interface` (the newest listed one below it for a patch CurseForge doesn't list yet). The changelog is `CHANGELOG.md`, with a line about the week's data on top.
+
+A manual run uploads only with **Upload to CurseForge** ticked. With **specs** filled in (for example `261,262`), it builds just those specs as a quick test and never uploads.
+
+**Releasing a new addon version.** Set `## Version` in the `.toc`, add the changes to `addon/KeystoneLens/CHANGELOG.md` (CurseForge shows it as the changelog), commit, then tag and push:
+
+```bat
+git tag addon-v1.2.0
+git push origin addon-v1.2.0
+```
+
+That run checks the tag against `## Version` and publishes at once; the weekly runs then keep using the new version.
+
+**Things to know:**
+- GitHub pauses scheduled workflows in a public repository after 60 days without a commit, and emails you first. Re-enable it under Actions → Addon, or push any commit.
+- The cache of key snapshots is about 1 GB. GitHub drops caches unused for 7 days, so a small Sunday run restores it to keep it. If it is lost anyway, the next run fetches every snapshot again, which takes longer and asks Raider.IO more.
+- A run fails, and uploads nothing, when more than 3 specs fail to build.
 
 Keep the `## Interface` line current with the live game (`/dump select(4, GetBuildInfo())` in game). Several values can be listed: `## Interface: 120105, 120200`.
 
@@ -113,19 +137,32 @@ Keep the `## Interface` line current with the live game (`/dump select(4, GetBui
 > - Item tooltips that say how many top players use an item.
 > - Switch to the dungeon of your keystone in one click.
 >
-> **Where the data comes from.** Keystone Lens is the companion of the free, open-source [Keystone Lens desktop app](https://github.com/mlvgog/keystone-lens) for Windows. The app finds the top players of a spec in raider.io's published Mythic+ data. It writes their talents and gear for this addon, and keeps the specs of your characters up to date. The app also reads the characters this addon saves, to compare them with the top players. Without the app, this addon has no data to show.
+> **Data.** The addon comes with data for every spec: the top 50 Mythic+ players world-wide, with every dungeon, renewed every week with an addon update. It is built from [Raider.IO](https://raider.io)'s public data, with their permission, and contains no player names.
 >
-> Data: raider.io. Not affiliated with Blizzard Entertainment or raider.io.
+> **Want fresher data?** The free, open-source [Keystone Lens desktop app](https://mlvgog.github.io/keystone-lens/) for Windows adds data whenever you look at a spec, for any region and number of players, and keeps your characters' specs up to date. It also reads the characters this addon saves, to compare them with the top players. Per spec, the addon shows whichever data is newer.
+>
+> Data: Raider.IO. Not affiliated with Blizzard Entertainment or Raider.IO.
 
-## A standalone version (not built yet)
+## The weekly data
 
-A standalone release would ship a data snapshot inside the addon (`KeystoneLensBundledData`), so it works without the app. The addon already reads such a table, and per spec the newest of the bundled and the app's data wins. The missing piece:
+[`scripts/build-addon-data.js`](../scripts/build-addon-data.js) runs the app's own data code in plain Node, without Electron. For each spec, it runs `analyze()` and `loadDungeon()` from `src/main/collector.js` (world-wide, top 50, current patch) and `specRecord()`, then writes `KeystoneLens_DB/{KeystoneLens_DB.toc,Data.lua}` with `dataFileText(records, { bundle: true })`:
 
-- a script (`scripts/build-addon-data.js`) that runs `analyze()` and `loadDungeon()` from `src/main/collector.js` for all specs. They are plain Node and need no Electron. It would write `addon/KeystoneLens/Data/Bundled.lua` with `dataFileText()`, with `source = "bundle"` and the global renamed. All 40 specs, top 50, with every dungeon, come to about 1–2 MB;
-- a weekly scheduled GitHub Actions job that runs it, bumps the addon version, and tags a release. That is a few thousand raider.io requests a week, most of them cached key snapshots after the first run.
+- **Size:** about 3 MB for all specs.
+- **Contents:** no player names, only aggregates and build import strings.
 
-**Why it waits.** A bundled snapshot redistributes data derived from raider.io in a public download. raider.io's API is meant for personal and community use, asks for attribution, and doesn't allow competing services or reselling data. It doesn't clearly cover bundling data in a public addon, and raider.io has its own addon. The companion mode is different: the data is computed on your own PC from your own requests, like the app's cache. Ask raider.io before publishing a standalone build, for example:
+**Raider.IO's permission.** In November 2026, Raider.IO agreed to the project as it was proposed to them:
+- once a week;
+- aggregated statistics only, with no player names;
+- credit with a link, in the addon and on the CurseForge page.
 
-> Hi! I make Keystone Lens (https://github.com/mlvgog/keystone-lens), a free, open-source desktop app that shows talent pick rates and gear of the top Mythic+ players per spec, using your public API, with credit and links to raider.io. I'd like to publish a free companion addon on CurseForge that ships a weekly snapshot of the aggregated statistics (pick rates per talent, popular builds, gear usage per slot for the top 50 players of each spec; no player names). It would make about N requests a week, cached. Is that use of the API okay with you, and are there conditions (attribution, rate, an API key) you'd like me to follow?
+Their [branding guidelines](https://raider.io/branding) ask not to edit, recolor or distort their logo. The addon credits them in text ("Raider.IO").
 
-If they agree, add the script and the scheduled workflow, then mention the bundled data in the CurseForge description.
+**Being polite to the API.** The build identifies itself as `KeystoneLens/<version> (addon data build; +<repository>)`. It uses at most 3 parallel requests to raider.io, against the app's 8 (`http.configure()`). It keeps every key snapshot it fetched in `.addon-data-cache`, carried between runs by the workflow's cache. A first run with an empty cache is about 20,000 raider.io requests and 70 minutes. A weekly run fetches only new keys plus the score and top-key lists, about half of that.
+
+**Running it locally:**
+
+```bat
+node scripts/build-addon-data.js --specs 261
+```
+
+This writes `build/addon/KeystoneLens_DB`. Copy that folder into `Interface/AddOns` to try it in game. `--specs` takes spec IDs; without it, every spec is built.

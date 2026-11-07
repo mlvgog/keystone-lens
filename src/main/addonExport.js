@@ -30,6 +30,17 @@ const SCHEMA = 1;
 const DATA_ADDON = 'KeystoneLens_Data';
 const MAIN_ADDON = 'KeystoneLens';
 const DATA_GLOBAL = 'KeystoneLensAppData';
+// The weekly data shipped with the addon on CurseForge (scripts/build-addon-data.js).
+const BUNDLE_ADDON = 'KeystoneLens_DB';
+const BUNDLE_GLOBAL = 'KeystoneLensBundledData';
+const APP_HEADER = [
+  '-- Written by the Keystone Lens app (https://github.com/mlvgog/keystone-lens).',
+  '-- Do not edit: the app rewrites this file. Delete the KeystoneLens_Data folder to remove the data.',
+];
+const BUNDLE_HEADER = [
+  "-- Weekly data for the Keystone Lens addon, built from Raider.IO's public Mythic+ data (https://raider.io).",
+  '-- Updated with the addon; do not edit. The Keystone Lens app adds fresher data in the KeystoneLens_Data folder.',
+];
 const TOP_ITEMS = 8;
 const TOP_ENCHANTS = 3;
 const TOP_GEMS = 6;
@@ -242,15 +253,16 @@ async function specRecord(session, { racials = null } = {}) {
  * The Lua data file. Each spec is built inside its own function: Lua 5.1 limits the number of
  * constants per function, and a file with many specs could otherwise exceed it.
  */
-function dataFileText(records, { appVersion = '', now = Date.now() } = {}) {
-  const head = { schema: SCHEMA, source: 'app', app: appVersion || undefined, time: Math.floor(now / 1000), specs: {} };
-  const lines = [
-    '-- Written by the Keystone Lens app (https://github.com/mlvgog/keystone-lens).',
-    '-- Do not edit: the app rewrites this file. Delete the KeystoneLens_Data folder to remove the data.',
-    `${DATA_GLOBAL} = ${toLua(head)}`,
-  ];
+/**
+ * The Lua data file. The app writes `KeystoneLensAppData` (source "app"); the weekly build passes
+ * `bundle: true` for `KeystoneLensBundledData` (source "bundle"). The addon reads both.
+ */
+function dataFileText(records, { appVersion = '', now = Date.now(), bundle = false } = {}) {
+  const global = bundle ? BUNDLE_GLOBAL : DATA_GLOBAL;
+  const head = { schema: SCHEMA, source: bundle ? 'bundle' : 'app', app: appVersion || undefined, time: Math.floor(now / 1000), specs: {} };
+  const lines = [...(bundle ? BUNDLE_HEADER : APP_HEADER), `${global} = ${toLua(head)}`];
   for (const rec of Object.values(records).sort((a, b) => a.specId - b.specId)) {
-    lines.push(`${DATA_GLOBAL}.specs[${Number(rec.specId)}] = (function() return ${toLua(rec)} end)()`);
+    lines.push(`${global}.specs[${Number(rec.specId)}] = (function() return ${toLua(rec)} end)()`);
   }
   return `${lines.join('\n')}\n`;
 }
@@ -268,6 +280,22 @@ function tocText({ interfaceVersion, appVersion }) {
     '## Notes: Talent and gear data for the Keystone Lens addon, written by the Keystone Lens app. Loads when you log in or /reload.',
     '## Author: Keystone Lens app',
     `## Version: ${appVersion || '0'}`,
+    `## Dependencies: ${MAIN_ADDON}`,
+    `## Group: ${MAIN_ADDON}`,
+    '',
+    'Data.lua',
+    '',
+  ].join('\n');
+}
+
+/** The .toc of the weekly data folder (`KeystoneLens_DB`), loaded with the addon like the app's. */
+function bundleTocText({ interfaceVersion, version }) {
+  return [
+    `## Interface: ${interfaceVersion}`,
+    '## Title: Keystone Lens Data (weekly)',
+    "## Notes: Weekly talent and gear data of the top Mythic+ players for the Keystone Lens addon, from Raider.IO's public data.",
+    '## Author: Gog',
+    `## Version: ${version}`,
     `## Dependencies: ${MAIN_ADDON}`,
     `## Group: ${MAIN_ADDON}`,
     '',
@@ -308,11 +336,14 @@ module.exports = {
   DATA_ADDON,
   MAIN_ADDON,
   DATA_GLOBAL,
+  BUNDLE_ADDON,
+  BUNDLE_GLOBAL,
   specRecord,
   talentsRecord,
   buildPicks,
   dataFileText,
   tocText,
+  bundleTocText,
   readTocField,
   writeDataAddon,
 };

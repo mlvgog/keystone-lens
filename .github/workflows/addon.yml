@@ -1,25 +1,64 @@
 name: Addon
 
-# Push a tag like addon-v1.0.0 (matching "## Version" in addon/KeystoneLens/KeystoneLens.toc)
-# to package the game addon and upload it to CurseForge. See docs/ADDON.md.
+# Packages the game addon with this week's data and uploads it to CurseForge (see docs/ADDON.md).
 #
-# The addon is not published as a GitHub release: the app's updater takes the repository's
+# - Every Wednesday after the US and EU weekly resets, and when an addon-v* tag is pushed
+#   (a tag must match "## Version" in addon/KeystoneLens/KeystoneLens.toc).
+# - By hand from the Actions tab. Manual runs only upload when "Upload to CurseForge" is ticked,
+#   and a run limited to a few specs never uploads.
+#
+# The data comes from scripts/build-addon-data.js. Raider.IO agreed to this use of their API:
+# once a week, aggregated statistics only, credited, no player names.
+# Uploads need the CF_API_TOKEN secret and the CF_PROJECT_ID repository variable; without them
+# the workflow only builds the zip (kept as a workflow artifact).
+#
+# The addon is never published as a GitHub release: the app's updater takes the repository's
 # latest GitHub release as the newest app version.
 on:
   push:
     tags: ['addon-v*']
+  schedule:
+    - cron: '23 7 * * 3' # Wednesday: build and upload
+    - cron: '23 7 * * 0' # Sunday: only touch the data cache, which GitHub drops after 7 unused days
   workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload to CurseForge
+        type: boolean
+        default: false
+      specs:
+        description: Only these spec IDs, comma separated (a quick test run, never uploaded)
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
+concurrency:
+  group: addon
+  cancel-in-progress: false
+
+env:
+  CACHE_DIR: .addon-data-cache
+
 jobs:
-  package:
+  # Restoring the cache counts as using it, so the weekly build finds last week's key snapshots.
+  keep-cache:
+    if: github.event.schedule == '23 7 * * 0'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
         with:
-          fetch-depth: 0 # the packager reads tags
+          path: ${{ env.CACHE_DIR }}
+          key: addon-data-keep-${{ github.run_id }}
+          restore-keys: addon-data-
+
+  package:
+    if: github.event.schedule != '23 7 * * 0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Check that the tag matches the addon version
         if: startsWith(github.ref, 'refs/tags/')
@@ -41,17 +80,88 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts # no Electron download needed
-      - run: node --test test/addon.test.js test/addonExport.test.js
+      - run: node --test test/addon.test.js test/addonExport.test.js test/addonData.test.js test/uploadCurseforge.test.js
 
-      # Uploads to CurseForge when the CF_API_TOKEN secret is set and the .toc has
-      # "## X-Curse-Project-ID"; otherwise it only builds the zip. Manual runs never upload (-d).
-      - uses: BigWigsMods/packager@v2
-        with:
-          args: -t addon/KeystoneLens ${{ startsWith(github.ref, 'refs/tags/') && ' ' || '-d' }}
+      - name: Decide whether to upload
+        id: plan
         env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          HAS_TOKEN: ${{ secrets.CF_API_TOKEN != '' }}
+          PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+          WANTED: ${{ github.event_name != 'workflow_dispatch' || inputs.upload }}
+          SPECS: ${{ inputs.specs }}
+        run: |
+          upload=false
+          if [ "$HAS_TOKEN" = true ] && [ -n "$PROJECT_ID" ] && [ "$WANTED" = true ] && [ -z "$SPECS" ]; then upload=true; fi
+          echo "upload=$upload" >> "$GITHUB_OUTPUT"
+          echo "Upload to CurseForge: $upload"
+
+      - name: Restore the data cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CACHE_DIR }}
+          key: addon-data-${{ github.run_id }}
+          restore-keys: addon-data-
+
+      # Key snapshots stay in the cache, so a run that hits the time limit continues next time.
+      - name: Build this week's data
+        id: build
+        timeout-minutes: 280
+        env:
+          SPECS: ${{ inputs.specs }}
+        run: node scripts/build-addon-data.js --out build/addon --cache "$CACHE_DIR" ${SPECS:+--specs "$SPECS"}
+
+      - name: Save the data cache
+        if: always() && steps.build.outcome != 'skipped'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CACHE_DIR }}
+          key: addon-data-${{ github.run_id }}
+
+      # The addon exactly as committed (no untracked or hidden files), and the week's data as its
+      # own folder. The KeystoneLens folder stays identical to the app's copy, so the app sees the
+      # same build.
+      - name: Package
+        id: package
+        run: |
+          version="$(sed -n 's/^## Version: *//p' addon/KeystoneLens/KeystoneLens.toc | tr -d '\r')"
+          label="$version-data.$(date -u +%Y%m%d)"
+          stage=build/package
+          rm -rf "$stage" && mkdir -p "$stage"
+          git archive HEAD addon/KeystoneLens | tar -x -C "$stage" --strip-components=1
+          find "$stage" -mindepth 1 -name '.*' -prune -exec rm -rf {} +
+          cp -r build/addon/KeystoneLens_DB "$stage/"
+          zip="build/KeystoneLens-$label.zip"
+          (cd "$stage" && zip -qrX "../KeystoneLens-$label.zip" KeystoneLens KeystoneLens_DB)
+          {
+            echo "zip=$zip"
+            echo "label=$label"
+            echo "date=$(date -u +%F)"
+          } >> "$GITHUB_OUTPUT"
+          echo "Packaged $zip"
+
+      - name: Check the zip
+        env:
+          ZIP: ${{ steps.package.outputs.zip }}
+        run: |
+          unzip -l "$ZIP"
+          list="$(unzip -Z1 "$ZIP")"
+          for f in KeystoneLens/KeystoneLens.toc KeystoneLens/Data.lua KeystoneLens_DB/KeystoneLens_DB.toc KeystoneLens_DB/Data.lua; do
+            grep -qx "$f" <<<"$list" || { echo "$f is missing from the zip"; exit 1; }
+          done
+          if grep -vqE '^(KeystoneLens|KeystoneLens_DB)/' <<<"$list"; then echo "Unexpected top-level entries"; exit 1; fi
+          if grep -qE '(^|/)\.' <<<"$list"; then echo "Hidden files in the zip"; exit 1; fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: KeystoneLens-addon
-          path: addon/KeystoneLens/.release/*.zip
+          path: ${{ steps.package.outputs.zip }}
+
+      - name: Upload to CurseForge
+        if: steps.plan.outputs.upload == 'true'
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+          ZIP: ${{ steps.package.outputs.zip }}
+          LABEL: ${{ steps.package.outputs.label }}
+          DATE: ${{ steps.package.outputs.date }}
+        run: node scripts/upload-curseforge.js --zip "$ZIP" --label "$LABEL" --data-date "$DATE"
