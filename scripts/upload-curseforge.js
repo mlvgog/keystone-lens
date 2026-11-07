@@ -4,7 +4,9 @@
 // BigWigs packager does: the game version comes from "## Interface" in the addon's .toc, and
 // the changelog is addon/KeystoneLens/CHANGELOG.md with a line about the week's data on top.
 //
-//   CF_API_TOKEN=... CF_PROJECT_ID=... node scripts/upload-curseforge.js --zip <file> --label <name>
+//   CF_API_TOKEN=... node scripts/upload-curseforge.js --zip <file> --label <name>
+//
+// The project is "## X-Curse-Project-ID" in the .toc (CF_PROJECT_ID overrides it).
 //
 // API: GET /api/game/wow/versions and POST /api/projects/<id>/upload-file on wow.curseforge.com,
 // with the token in the x-api-token header.
@@ -54,17 +56,23 @@ function gameVersionIds(versions, interfaceField) {
   return ids;
 }
 
+/** A `## Field: value` line of a .toc, or null. */
+function tocField(toc, field) {
+  return new RegExp(`^##\\s*${field}\\s*:\\s*(.+?)\\s*$`, 'mi').exec(String(toc || ''))?.[1] || null;
+}
+
 function metadata({ label, gameVersions, changelog, dataDate }) {
   const head = dataDate ? `**Data of ${dataDate}:** the top 50 Mythic+ players of every spec, world-wide, from Raider.IO.\n\n` : '';
   return { displayName: label, gameVersions, releaseType: 'release', changelog: head + changelog, changelogType: 'markdown' };
 }
 
 async function upload({ zip, label, dataDate, token, projectId, toc, changelog, fetchImpl = fetch }) {
-  if (!token || !projectId) throw new Error('CF_API_TOKEN and CF_PROJECT_ID are needed to upload');
+  projectId = projectId || tocField(toc, 'X-Curse-Project-ID');
+  if (!token || !projectId) throw new Error('CF_API_TOKEN and a project ID (## X-Curse-Project-ID) are needed to upload');
   const headers = { 'x-api-token': token };
   const res = await fetchImpl(`${SITE}/api/game/wow/versions`, { headers });
   if (!res.ok) throw new Error(`CurseForge game versions: HTTP ${res.status}`);
-  const interfaceField = /^##\s*Interface\s*:\s*(.+?)\s*$/m.exec(toc)?.[1];
+  const interfaceField = tocField(toc, 'Interface');
   if (!interfaceField) throw new Error('No ## Interface in the .toc');
   const meta = metadata({ label, gameVersions: gameVersionIds(await res.json(), interfaceField), changelog, dataDate });
 
@@ -105,4 +113,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { interfaceToVersion, gameVersionIds, metadata, upload, RETAIL };
+module.exports = { interfaceToVersion, gameVersionIds, metadata, upload, tocField, RETAIL };

@@ -9,8 +9,8 @@ name: Addon
 #
 # The data comes from scripts/build-addon-data.js. Raider.IO agreed to this use of their API:
 # once a week, aggregated statistics only, credited, no player names.
-# Uploads need the CF_API_TOKEN secret and the CF_PROJECT_ID repository variable; without them
-# the workflow only builds the zip (kept as a workflow artifact).
+# Uploads need the CF_API_TOKEN secret; the project is "## X-Curse-Project-ID" in the .toc.
+# Without the secret, the workflow only builds the zip (kept as a workflow artifact).
 #
 # The addon is never published as a GitHub release: the app's updater takes the repository's
 # latest GitHub release as the newest app version.
@@ -86,12 +86,12 @@ jobs:
         id: plan
         env:
           HAS_TOKEN: ${{ secrets.CF_API_TOKEN != '' }}
-          PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
           WANTED: ${{ github.event_name != 'workflow_dispatch' || inputs.upload }}
           SPECS: ${{ inputs.specs }}
         run: |
           upload=false
-          if [ "$HAS_TOKEN" = true ] && [ -n "$PROJECT_ID" ] && [ "$WANTED" = true ] && [ -z "$SPECS" ]; then upload=true; fi
+          project="$(sed -n 's/^## X-Curse-Project-ID: *//p' addon/KeystoneLens/KeystoneLens.toc | tr -d '\r')"
+          if [ "$HAS_TOKEN" = true ] && [ -n "$project" ] && [ "$WANTED" = true ] && [ -z "$SPECS" ]; then upload=true; fi
           echo "upload=$upload" >> "$GITHUB_OUTPUT"
           echo "Upload to CurseForge: $upload"
 
@@ -160,7 +160,6 @@ jobs:
         if: steps.plan.outputs.upload == 'true'
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
           ZIP: ${{ steps.package.outputs.zip }}
           LABEL: ${{ steps.package.outputs.label }}
           DATE: ${{ steps.package.outputs.date }}

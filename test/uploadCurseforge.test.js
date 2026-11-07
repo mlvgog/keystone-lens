@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { interfaceToVersion, gameVersionIds, metadata, upload, RETAIL } = require('../scripts/upload-curseforge');
+const { interfaceToVersion, gameVersionIds, metadata, upload, tocField, RETAIL } = require('../scripts/upload-curseforge');
 
 const VERSIONS = [
   { id: 13000, gameVersionTypeID: RETAIL, name: '12.0.5' },
@@ -61,8 +61,20 @@ test('the upload asks for the game versions, then posts the zip with its metadat
   assert.equal(form.get('file').name, 'KeystoneLens-1.2.0-data.20261111.zip');
   assert.equal(await form.get('file').text(), 'PK fake zip');
 
-  await assert.rejects(upload({ zip, label: 'x', token: '', projectId: '1', toc: '', changelog: '', fetchImpl }), /CF_API_TOKEN and CF_PROJECT_ID/);
+  // Without CF_PROJECT_ID, the project comes from the .toc.
+  calls.length = 0;
+  await upload({ zip, label: 'x', token: 'secret', projectId: undefined, toc: '## Interface: 120105\n## X-Curse-Project-ID: 1790549\n', changelog: '', fetchImpl });
+  assert.equal(calls[1].url, 'https://wow.curseforge.com/api/projects/1790549/upload-file');
+
+  await assert.rejects(upload({ zip, label: 'x', token: '', projectId: '1', toc: '', changelog: '', fetchImpl }), /CF_API_TOKEN and a project ID/);
+  await assert.rejects(upload({ zip, label: 'x', token: 't', projectId: '', toc: '## Interface: 120105', changelog: '', fetchImpl }), /CF_API_TOKEN and a project ID/);
   const failing = async (url) => (url.endsWith('/versions') ? { ok: true, json: async () => VERSIONS } : { ok: false, status: 403, text: async () => 'Forbidden' });
   await assert.rejects(upload({ zip, label: 'x', token: 't', projectId: '1', toc: '## Interface: 120105', changelog: '', fetchImpl: failing }), /HTTP 403 Forbidden/);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("the addon's .toc names its CurseForge project", () => {
+  const toc = fs.readFileSync(path.join(__dirname, '..', 'addon', 'KeystoneLens', 'KeystoneLens.toc'), 'utf8');
+  assert.equal(tocField(toc, 'X-Curse-Project-ID'), '1790549');
+  assert.equal(tocField(toc, 'Nope'), null);
 });
