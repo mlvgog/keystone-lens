@@ -64,11 +64,11 @@ This workflow does not publish the game addon separately.
 
 ## Releasing the game addon
 
-The game addon has its own version (`## Version` in `addon/KeystoneLens/KeystoneLens.toc`) and its own tags, `addon-v<version>`. See [ADDON.md](ADDON.md#publishing-on-curseforge). The app also carries a copy of the addon, so each app release brings the addon version that is in the repository at that tag.
+The game addon has its own version (`## Version` in `addon/KeystoneLens/KeystoneLens.toc`) but is released **with the app**. Each app release carries the addon at its tag. When the release is published, its Release workflow starts the Addon workflow, which uploads that same addon to CurseForge with the week's data. The weekly CurseForge uploads keep using the addon of the latest app release. So bump `## Version` and add a `CHANGELOG.md` entry whenever the addon changes, then release the app. See [ADDON.md](ADDON.md#publishing-on-curseforge).
 
 The app replaces an addon copy it installed whenever its own copy differs, even with the same version number. Still bump `## Version` for every addon release: CurseForge, the version shown in game, and copies not installed by the app go by the number.
 
-**Never publish a GitHub release that isn't an app release as the repository's latest release.** The app's updater takes the latest GitHub release as the newest app version, and fails if it has no `latest.yml`. The addon workflow therefore uploads to CurseForge and keeps its zip as a workflow artifact, never as a GitHub release.
+**Never publish a GitHub release that isn't an app release as the repository's latest release.** The app's updater takes the latest GitHub release as the newest app version, and fails if it has no `latest.yml`. The addon workflow therefore uploads to CurseForge, keeps its zip as a workflow artifact, and puts the weekly data for the app on the `addon-data` **prerelease** (never "latest"; the updater and the website ignore prereleases).
 
 ## The website
 

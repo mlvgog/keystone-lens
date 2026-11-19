@@ -6,7 +6,9 @@
  * - every Mythic+ analysis you run is added to the addon's data (one record per spec);
  * - the specs of your characters (saved by the addon) are refreshed in the background when
  *   their data is over a day old, one at a time, and paused while you run your own searches;
- * - the bundled addon can be installed or updated in the game folder.
+ * - the bundled addon can be installed or updated in the game folder;
+ * - the weekly data for every spec (the same as on CurseForge, see weeklyData.js) is installed
+ *   next to it and kept current, unless CurseForge already does that.
  * Records are kept in userData/addon-data.json, so the data folder can always be rewritten.
  */
 
@@ -15,11 +17,13 @@ const path = require('path');
 const wow = require('./wow');
 const { specRecord, writeDataAddon } = require('./addonExport');
 const { slugifyRealm } = require('./sources/raiderio');
+const { weeklyAction } = require('./weeklyData');
 
 const STORE_FILE = 'addon-data.json';
 const STALE_SECONDS = 24 * 60 * 60;
 const START_DELAY_MS = 30 * 1000;
 const RESUME_DELAY_MS = 60 * 1000;
+const WEEKLY_CHECK_MS = 6 * 60 * 60 * 1000;
 
 /** The addon writes realm slugs with plain-ASCII rules; use the app's (raider.io) slug instead. */
 function withServerSlug(simc, realm) {
@@ -37,6 +41,8 @@ function withServerSlug(simc, realm) {
  * - racials(classId) -> racial abilities per race, for the records (races.racialsByRace); optional
  * - analyze(opts, { signal }) -> { session }; loadDungeon(session, zoneId, { signal })
  * - onStatus(status): called when something visible changes
+ * - weekly: { local(addonsDir), fetchManifest(), install(addonsDir, manifest) } for the weekly
+ *   data (weeklyData.js); without it, the weekly data is left alone
  * - findWowFolder, setTimeout, clearTimeout: injectable for tests
  */
 function createAddonSync(deps) {
@@ -50,6 +56,7 @@ function createAddonSync(deps) {
     loadDungeon,
     racials = null,
     onStatus = () => {},
+    weekly: weeklyDeps = null,
     findWowFolder = wow.findWowFolder,
     setTimeout: setTimer = setTimeout,
     clearTimeout: clearTimer = clearTimeout,
@@ -66,6 +73,11 @@ function createAddonSync(deps) {
   let timer = null;
   let paused = false;
   let writeQueue = Promise.resolve();
+  // The weekly data in AddOns: version, source ('app': installed by the app, 'other': CurseForge
+  // or by hand), the latest published version, and the last error.
+  let weekly = { version: null, source: null, latest: null, error: null };
+  let weeklyRun = null;
+  let weeklyTimer = null;
 
   const wowPath = () => settings.get().wowPath || null;
 
@@ -75,6 +87,8 @@ function createAddonSync(deps) {
       addon,
       autoRefresh: settings.get().addonSync !== false,
       autoUpdate: settings.get().addonAutoUpdate !== false,
+      weeklyData: settings.get().addonWeeklyData !== false,
+      weekly,
       addonUpdated,
       characters: characters.map(({ simc, ...c }) => c),
       specs: Object.values(records)
@@ -154,6 +168,50 @@ function createAddonSync(deps) {
     }
   }
 
+  async function doSyncWeekly() {
+    const retail = wowPath();
+    if (!weeklyDeps || !retail || !addon.installed) {
+      weekly = { ...weekly, version: null, source: null };
+      return false;
+    }
+    const dir = wow.addonsDir(retail);
+    const local = await weeklyDeps.local(dir);
+    weekly = { ...weekly, version: local.version, source: local.version ? (local.managed ? 'app' : 'other') : null };
+    // A copy from CurseForge is kept current by CurseForge; with the setting off, nothing is done.
+    if (settings.get().addonWeeklyData === false || (local.version && !local.managed)) return false;
+    try {
+      const manifest = await weeklyDeps.fetchManifest();
+      weekly = { ...weekly, latest: manifest.version, error: null };
+      if (!weeklyAction(local, manifest.version)) return false;
+      await weeklyDeps.install(dir, manifest);
+      const now = await weeklyDeps.local(dir);
+      weekly = { ...weekly, version: now.version, source: 'app' };
+      return true;
+    } catch (err) {
+      weekly = { ...weekly, error: `Could not get the weekly data: ${err.message}` };
+      return false;
+    }
+  }
+
+  /** Install or update the weekly data when it is the app's to manage (one check at a time). */
+  function syncWeekly() {
+    weeklyRun ||= doSyncWeekly().finally(() => {
+      weeklyRun = null;
+      changed();
+    });
+    return weeklyRun;
+  }
+
+  /** Look for new weekly data every few hours while the app runs. */
+  function scheduleWeekly() {
+    if (!weeklyDeps) return;
+    if (weeklyTimer) clearTimer(weeklyTimer);
+    weeklyTimer = setTimer(() => {
+      weeklyTimer = null;
+      syncWeekly().finally(scheduleWeekly);
+    }, WEEKLY_CHECK_MS);
+  }
+
   /** Load saved data, find the game folder if none is set, update the addon, plan the first background refresh. */
   async function init() {
     await loadStore();
@@ -164,6 +222,8 @@ function createAddonSync(deps) {
     await refreshGame();
     await updateIfManaged();
     changed();
+    syncWeekly();
+    scheduleWeekly();
     schedule(START_DELAY_MS);
   }
 
@@ -175,6 +235,7 @@ function createAddonSync(deps) {
     await refreshGame();
     await updateIfManaged();
     await writeData();
+    await syncWeekly();
     schedule(START_DELAY_MS);
     return status();
   }
@@ -185,6 +246,7 @@ function createAddonSync(deps) {
     await wow.installAddon(retail, bundledAddonDir);
     await refreshGame();
     await writeData();
+    await syncWeekly();
     return status();
   }
 
@@ -192,6 +254,7 @@ function createAddonSync(deps) {
   async function rescan() {
     await refreshGame();
     await updateIfManaged();
+    await syncWeekly();
     changed();
     schedule(0);
     return status();
@@ -295,7 +358,7 @@ function createAddonSync(deps) {
     return characters.map((c) => ({ ...c, simc: withServerSlug(c.simc, c.realm) }));
   }
 
-  return { init, status, setWowPath, installAddon, rescan, recordSession, removeSpec, writeData, staleSpecs, runBackground, pause, resume, addonCharacters };
+  return { init, status, setWowPath, installAddon, rescan, syncWeekly, recordSession, removeSpec, writeData, staleSpecs, runBackground, pause, resume, addonCharacters };
 }
 
 module.exports = { createAddonSync, withServerSlug, STALE_SECONDS };

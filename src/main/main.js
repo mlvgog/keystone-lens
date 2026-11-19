@@ -57,6 +57,7 @@ const http = require('./http');
 const { createUpdater, LATEST_RELEASE_API } = require('./updater');
 const { createAddonSync } = require('./addonSync');
 const races = require('./races');
+const weeklyData = require('./weeklyData');
 
 const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
 const EXTERNAL_HOSTS = new Set([
@@ -430,6 +431,7 @@ ipcMain.handle('settings:set', (_e, patch) => {
   if (patch.addonSync === false) addonSync?.pause(); // stop a refresh that is running
   if (patch.addonSync === true) addonSync?.resume();
   if (patch.addonAutoUpdate === true) addonSync?.rescan().catch(() => {}); // update now if needed
+  if (patch.addonWeeklyData === true) addonSync?.syncWeekly().catch(() => {});
   return settings.getPublic();
 });
 
@@ -499,6 +501,11 @@ function initAddonSync() {
     analyze,
     loadDungeon,
     racials: (classId) => races.racialsByRace(classId),
+    weekly: {
+      local: weeklyData.localWeekly,
+      fetchManifest: () => weeklyData.fetchManifest(http.fetchJson),
+      install: (dir, manifest) => weeklyData.installWeekly(dir, manifest, http.fetchText),
+    },
     onStatus: (status) => {
       if (win && !win.isDestroyed()) win.webContents.send('addon:status', status);
     },

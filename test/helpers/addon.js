@@ -7,7 +7,8 @@ const path = require('path');
 const { lua, lauxlib, to_luastring } = require('fengari');
 const helpers = require('./lua');
 
-const ADDON_DIR = path.join(__dirname, '..', '..', 'addon', 'KeystoneLens');
+// KEYSTONE_LENS_ADDON_DIR: another copy of the addon, e.g. the one the Addon workflow packaged.
+const ADDON_DIR = process.env.KEYSTONE_LENS_ADDON_DIR ? path.resolve(process.env.KEYSTONE_LENS_ADDON_DIR) : path.join(__dirname, '..', '..', 'addon', 'KeystoneLens');
 const STUB = path.join(__dirname, 'wow_stub.lua');
 
 /** Lua files in the order the .toc lists them. */
