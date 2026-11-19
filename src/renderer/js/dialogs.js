@@ -493,6 +493,8 @@ export async function settingsDialog({ onChanged }) {
     onAutoRefresh: (on) => save({ addonSync: on }),
     autoUpdate: settings.addonAutoUpdate !== false,
     onAutoUpdate: (on) => save({ addonAutoUpdate: on }),
+    weeklyData: settings.addonWeeklyData !== false,
+    onWeeklyData: (on) => save({ addonWeeklyData: on }),
   });
 
   const dev = el(

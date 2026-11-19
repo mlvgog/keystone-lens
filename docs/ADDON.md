@@ -90,7 +90,9 @@ The stand-in API can't prove that Blizzard's frames behave as expected. Before a
 
 ## Publishing on CurseForge
 
-The **Addon** workflow ([`addon.yml`](../.github/workflows/addon.yml)) publishes the addon with fresh data every **Wednesday** at 07:23 UTC, after the US and EU weekly resets. It also runs when you push an `addon-v*` tag, and by hand from the Actions tab.
+The **Addon** workflow ([`addon.yml`](../.github/workflows/addon.yml)) publishes the addon with fresh data every **Wednesday** at 07:23 UTC, after the US and EU weekly resets. It also runs after every app release, and by hand from the Actions tab.
+
+**The addon is released with the app.** The workflow always packages the addon of the **latest app release**, so CurseForge and the app carry the same addon version. A new app release starts the workflow (`release.yml`), so its addon reaches CurseForge right away. The same week's data goes to CurseForge and, for the app, to the `addon-data` prerelease of this repository (see [Weekly data for app users](#weekly-data-for-app-users)).
 
 **One-time setup:**
 
@@ -104,20 +106,14 @@ Without the secret, every run only builds the zip, which you can download from t
 
 1. Lints and tests the addon, the data build and the upload script.
 2. Builds the week's data with `scripts/build-addon-data.js`, using the cache of key snapshots from earlier runs.
-3. Zips the addon exactly as committed (`git archive`, without hidden files) and the data as its own `KeystoneLens_DB` folder. The `KeystoneLens` folder is identical to the app's copy, so the app sees the same build.
+3. Zips the addon exactly as the latest app release has it (`git archive <tag>`, without hidden files) and the data as its own `KeystoneLens_DB` folder, which gets the same `## Interface` as the addon. The `KeystoneLens` folder is identical to the app's copy, so the app sees the same build. When `main` already has a newer addon version, the run warns and still ships the released one.
 4. Checks the zip (both folders, nothing else, nothing hidden), then loads the week's data in the addon itself (`scripts/check-addon-data.js`: Lua 5.1 VM with the tests' stand-in WoW API). Every spec must load with players, talents, builds and per-dungeon builds, the `/kl` window must open, and at least 20 specs must be there. The zip is kept as an artifact.
-5. When it may, uploads it with `scripts/upload-curseforge.js` as, for example, `1.2.0-data.20261111`: the addon version and the data's date. The upload uses the CurseForge game version for `## Interface` (the newest listed one below it for a patch CurseForge doesn't list yet). The changelog is `CHANGELOG.md`, with a line about the week's data on top.
+5. When it may, uploads it with `scripts/upload-curseforge.js` as, for example, `1.2.1-data.20261125`: the addon version and the data's date. The upload uses the CurseForge game version for `## Interface` (the newest listed one below it for a patch CurseForge doesn't list yet). The changelog is `CHANGELOG.md`, with a line about the week's data on top. It never uploads an addon version lower than the last one published.
+6. Publishes the same data for the app: `Data.lua`, `KeystoneLens_DB.toc` and `manifest.json` (`scripts/weekly-manifest.js`: the data's version, the addon version and each file's SHA-256) on the `addon-data` prerelease.
 
 A manual run uploads only with **Upload to CurseForge** ticked. With **specs** filled in (for example `261,262`), it builds just those specs as a quick test and never uploads.
 
-**Releasing a new addon version.** Set `## Version` in the `.toc`, add the changes to `addon/KeystoneLens/CHANGELOG.md` (CurseForge shows it as the changelog), commit, then tag and push:
-
-```bat
-git tag addon-v1.2.0
-git push origin addon-v1.2.0
-```
-
-That run checks the tag against `## Version` and publishes at once; the weekly runs then keep using the new version.
+**Releasing a new addon version.** Set `## Version` in the `.toc` and add the changes to `addon/KeystoneLens/CHANGELOG.md` (CurseForge shows it as the changelog), then release the app as usual (see [RELEASING.md](RELEASING.md)). The app release carries the addon, and its Release workflow starts the Addon workflow, which uploads the same addon to CurseForge.
 
 **Things to know:**
 - GitHub pauses scheduled workflows in a public repository after 60 days without a commit, and emails you first. Re-enable it under Actions → Addon, or push any commit.
@@ -144,6 +140,16 @@ Keep the `## Interface` line current with the live game (`/dump select(4, GetBui
 > **Want fresher data?** The free, open-source [Keystone Lens desktop app](https://mlvgog.github.io/keystone-lens/) for Windows adds data whenever you look at a spec, for any region and number of players, and keeps your characters' specs up to date. It also reads the characters this addon saves, to compare them with the top players. Per spec, the addon shows whichever data is newer.
 >
 > Data: Raider.IO. Not affiliated with Blizzard Entertainment or Raider.IO.
+
+## Weekly data for app users
+
+Players who installed the addon with the app get the same weekly data as CurseForge players ([`src/main/weeklyData.js`](../src/main/weeklyData.js)). When the addon is installed, the app reads `manifest.json` of the `addon-data` prerelease: at start-up, on Rescan, and every 6 hours. It then:
+
+- installs `KeystoneLens_DB` when it is missing, with the same marker file as its addon copy;
+- updates its own copy when a newer week is published, after checking each file against its SHA-256 and swapping the folder in whole;
+- **never touches a copy without the marker**, from CurseForge or by hand, because CurseForge keeps that one current.
+
+⚙ Settings → Game addon has a checkbox for this (on by default) and says where the weekly data comes from. The app's own data (`KeystoneLens_Data`, the specs you look at) stays separate, and per spec the addon shows the newer of the two. So the app and a CurseForge install work side by side: CurseForge updates `KeystoneLens` and `KeystoneLens_DB`, and the app updates `KeystoneLens_Data`. The app only updates a `KeystoneLens` or `KeystoneLens_DB` folder that it installed itself.
 
 ## The weekly data
 

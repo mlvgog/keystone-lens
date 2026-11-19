@@ -1,9 +1,12 @@
 name: Addon
 
-# Packages the game addon with this week's data and uploads it to CurseForge (see docs/ADDON.md).
+# Packages the game addon with this week's data, uploads it to CurseForge, and publishes the same
+# data for the app (the "addon-data" prerelease, see src/main/weeklyData.js). See docs/ADDON.md.
 #
-# - Every Wednesday after the US and EU weekly resets, and when an addon-v* tag is pushed
-#   (a tag must match "## Version" in addon/KeystoneLens/KeystoneLens.toc).
+# The addon is always the one in the latest app release, so CurseForge and the app carry the same
+# version. A new app release starts this workflow (release.yml), which publishes its addon at once.
+#
+# - Every Wednesday after the US and EU weekly resets, and after each app release.
 # - By hand from the Actions tab. Manual runs only upload when "Upload to CurseForge" is ticked,
 #   and a run limited to a few specs never uploads.
 #
@@ -12,11 +15,9 @@ name: Addon
 # Uploads need the CF_API_TOKEN secret; the project is "## X-Curse-Project-ID" in the .toc.
 # Without the secret, the workflow only builds the zip (kept as a workflow artifact).
 #
-# The addon is never published as a GitHub release: the app's updater takes the repository's
-# latest GitHub release as the newest app version.
+# The data goes to a prerelease, never to a release: the app's updater and the website take the
+# repository's latest release as the newest app version, and both ignore prereleases.
 on:
-  push:
-    tags: ['addon-v*']
   schedule:
     - cron: '23 7 * * 3' # Wednesday: build and upload
     - cron: '23 7 * * 0,5' # Friday and Sunday: only touch the data cache, which GitHub drops after 7 unused days
@@ -58,6 +59,8 @@ jobs:
     if: github.event.schedule != '23 7 * * 0,5'
     runs-on: ubuntu-latest
     timeout-minutes: 340
+    permissions:
+      contents: write # the addon-data prerelease
     steps:
       - uses: actions/checkout@v4
 
@@ -68,15 +71,6 @@ jobs:
           path: ${{ env.CACHE_DIR }}
           key: addon-data-${{ github.run_id }}
           restore-keys: addon-data-
-
-      - name: Check that the tag matches the addon version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          version="$(sed -n 's/^## Version: *//p' addon/KeystoneLens/KeystoneLens.toc | tr -d '\r')"
-          if [ "addon-v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match ## Version: $version"
-            exit 1
-          fi
 
       # Ubuntu's package servers are sometimes unreachable from the runner. A scheduled run then
       # skips the lint (CI linted the code on main) rather than skipping a week's data.
@@ -102,7 +96,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts # no Electron download needed
-      - run: node --test test/addon.test.js test/addonExport.test.js test/addonData.test.js test/uploadCurseforge.test.js
+      - run: node --test test/addon.test.js test/addonExport.test.js test/addonData.test.js test/uploadCurseforge.test.js test/weeklyData.test.js
 
       - name: Decide whether to upload
         id: plan
@@ -132,27 +126,41 @@ jobs:
           path: ${{ env.CACHE_DIR }}
           key: addon-data-${{ github.run_id }}
 
-      # The addon exactly as committed (no untracked or hidden files), and the week's data as its
-      # own folder. The KeystoneLens folder stays identical to the app's copy, so the app sees the
-      # same build.
+      # The addon exactly as the latest app release has it (no untracked or hidden files), and the
+      # week's data as its own folder. The KeystoneLens folder is identical to the app's copy, so
+      # the app sees the same build.
       - name: Package
         id: package
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          version="$(sed -n 's/^## Version: *//p' addon/KeystoneLens/KeystoneLens.toc | tr -d '\r')"
+          toc_version() { sed -n 's/^## Version: *//p' | tr -d '\r'; }
+          release="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          git fetch --quiet --depth=1 origin tag "$release"
+          version="$(git show "$release:addon/KeystoneLens/KeystoneLens.toc" | toc_version)"
+          main_version="$(toc_version < addon/KeystoneLens/KeystoneLens.toc)"
+          if [ "$version" != "$main_version" ]; then
+            echo "::warning::main has addon $main_version, the latest app release ($release) has $version. CurseForge gets $version until the app is released."
+          fi
           label="$version-data.$(date -u +%Y%m%d)"
           stage=build/package
           rm -rf "$stage" && mkdir -p "$stage"
-          git archive HEAD addon/KeystoneLens | tar -x -C "$stage" --strip-components=1
+          git archive "$release" addon/KeystoneLens | tar -x -C "$stage" --strip-components=1
           find "$stage" -mindepth 1 -name '.*' -prune -exec rm -rf {} +
           cp -r build/addon/KeystoneLens_DB "$stage/"
+          # The data folder declares the same game versions as the addon it goes with.
+          interface="$(sed -n 's/^## Interface: *//p' "$stage/KeystoneLens/KeystoneLens.toc" | tr -d '\r')"
+          sed -i "s/^## Interface: .*/## Interface: $interface/" "$stage/KeystoneLens_DB/KeystoneLens_DB.toc"
           zip="build/KeystoneLens-$label.zip"
           (cd "$stage" && zip -qrX "../KeystoneLens-$label.zip" KeystoneLens KeystoneLens_DB)
           {
             echo "zip=$zip"
             echo "label=$label"
             echo "date=$(date -u +%F)"
+            echo "version=$version"
+            echo "main_version=$main_version"
           } >> "$GITHUB_OUTPUT"
-          echo "Packaged $zip"
+          echo "Packaged $zip: addon $version from $release"
 
       - name: Check the zip
         env:
@@ -166,17 +174,20 @@ jobs:
           if grep -vqE '^(KeystoneLens|KeystoneLens_DB)/' <<<"$list"; then echo "Unexpected top-level entries"; exit 1; fi
           if grep -qE '(^|/)\.' <<<"$list"; then echo "Hidden files in the zip"; exit 1; fi
 
-      # The week's real data, read by the addon itself (Lua 5.1 VM, stand-in WoW API).
+      # The week's real data, read by the packaged addon itself (Lua 5.1 VM, stand-in WoW API).
       - name: Check the data in the addon
         env:
           SPECS: ${{ inputs.specs }}
-        run: node scripts/check-addon-data.js build/addon/KeystoneLens_DB/Data.lua --min-specs "$([ -n "$SPECS" ] && echo 1 || echo 20)"
+          KEYSTONE_LENS_ADDON_DIR: build/package/KeystoneLens
+        run: node scripts/check-addon-data.js build/package/KeystoneLens_DB/Data.lua --min-specs "$([ -n "$SPECS" ] && echo 1 || echo 20)"
 
       - uses: actions/upload-artifact@v4
         with:
           name: KeystoneLens-addon
           path: ${{ steps.package.outputs.zip }}
 
+      # Never a lower addon version than the one already published. Before the first publish,
+      # the latest app release must have caught up with main.
       - name: Upload to CurseForge
         if: steps.plan.outputs.upload == 'true'
         env:
@@ -184,4 +195,35 @@ jobs:
           ZIP: ${{ steps.package.outputs.zip }}
           LABEL: ${{ steps.package.outputs.label }}
           DATE: ${{ steps.package.outputs.date }}
-        run: node scripts/upload-curseforge.js --zip "$ZIP" --label "$LABEL" --data-date "$DATE"
+          VERSION: ${{ steps.package.outputs.version }}
+          MAIN_VERSION: ${{ steps.package.outputs.main_version }}
+        run: |
+          older() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$1" ]; }
+          published="$(curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/addon-data/manifest.json" | jq -r '.addon // empty' || true)"
+          if [ -n "$published" ] && older "$VERSION" "$published"; then
+            echo "::error::Addon $VERSION is older than the published $published. Not uploading."
+            exit 1
+          fi
+          if [ -z "$published" ] && older "$VERSION" "$MAIN_VERSION"; then
+            echo "::error::The latest app release has addon $VERSION, main has $MAIN_VERSION. Release the app first."
+            exit 1
+          fi
+          node scripts/upload-curseforge.js --zip "$ZIP" --label "$LABEL" --data-date "$DATE"
+
+      # The same data for the app (src/main/weeklyData.js): the files first, the manifest last.
+      - name: Publish the data for the app
+        if: steps.plan.outputs.upload == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          dir=build/package/KeystoneLens_DB
+          export DATA_VERSION="$(sed -n 's/^## Version: *//p' "$dir/KeystoneLens_DB.toc" | tr -d '\r')"
+          node scripts/weekly-manifest.js "$dir" > build/manifest.json
+          cat build/manifest.json
+          if ! gh release view addon-data >/dev/null 2>&1; then
+            gh release create addon-data --prerelease --latest=false --title "Weekly addon data" \
+              --notes "The weekly data of the Keystone Lens game addon, for the app. Not an app release: get the app from the latest release."
+          fi
+          gh release upload addon-data "$dir/Data.lua" "$dir/KeystoneLens_DB.toc" --clobber
+          gh release upload addon-data build/manifest.json --clobber

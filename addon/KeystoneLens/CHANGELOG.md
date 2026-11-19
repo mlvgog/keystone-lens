@@ -1,5 +1,10 @@
 # Keystone Lens addon
 
+## 1.2.1
+
+- **Ready for patch 12.1.7:** the addon declares both 12.1.5 and 12.1.7, so it won't show as out of date when the patch goes live.
+- **The same version everywhere:** from now on the addon on CurseForge is always the one in the latest Keystone Lens app, and the app installs the same weekly data for every spec as CurseForge. Using the app and the CurseForge addon together works: each keeps its own folders current, and per spec you see the newer data.
+
 ## 1.2.0
 
 - **Works on its own.** The addon now comes with data for every spec: the top 50 Mythic+ players world-wide, with every dungeon, from Raider.IO's public data. It is renewed every week with an addon update. You no longer need the desktop app to use it.

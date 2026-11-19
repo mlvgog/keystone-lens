@@ -14,6 +14,7 @@ const DEFAULTS = {
   wowPath: '',
   addonSync: true,
   addonAutoUpdate: true,
+  addonWeeklyData: true,
 };
 const REGIONS = ['world', 'us', 'eu', 'kr', 'tw'];
 const SIZES = [25, 50, 100];
@@ -74,6 +75,7 @@ function sanitize(s, validLocales) {
     addonSync: typeof s.addonSync === 'boolean' ? s.addonSync : DEFAULTS.addonSync,
     // Replace the addon copy the app installed when the app has a newer build of it.
     addonAutoUpdate: typeof s.addonAutoUpdate === 'boolean' ? s.addonAutoUpdate : DEFAULTS.addonAutoUpdate,
+    addonWeeklyData: typeof s.addonWeeklyData === 'boolean' ? s.addonWeeklyData : DEFAULTS.addonWeeklyData,
   };
 }
 

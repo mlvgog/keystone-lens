@@ -27,8 +27,20 @@ export function addonLineText(s) {
   return [`✔ Version ${a.installed} installed, the same as this app's.`, 'good'];
 }
 
+/** The line about the weekly data for every spec: [text, class]. */
+export function weeklyText(s) {
+  const w = s?.weekly || {};
+  if (!s?.addon?.installed) return ['', ''];
+  if (w.source === 'other') return [`Weekly data from ${w.version}, kept current by CurseForge.`, 'good'];
+  if (w.source === 'app' && s.weeklyData === false) return [`Weekly data from ${w.version}; it is no longer updated.`, ''];
+  if (w.source === 'app') return [`✔ Weekly data from ${w.version} for every spec. Specs you look at here get fresher data on top.`, 'good'];
+  if (s.weeklyData === false) return ['Only the specs you look at in the app are in the addon.', ''];
+  if (w.error) return [w.error, 'bad'];
+  return ['The weekly data is added shortly.', ''];
+}
+
 /** The "Game addon" part of Settings. Returns { node, dispose }. */
-export function addonSection({ autoRefresh, onAutoRefresh, autoUpdate, onAutoUpdate }) {
+export function addonSection({ autoRefresh, onAutoRefresh, autoUpdate, onAutoUpdate, weeklyData = true, onWeeklyData = () => {} }) {
   const folder = el('div.addon-folder.dim', '…');
   const chooseBtn = el('button.wow-btn.small', 'Change…');
   const addonLine = el('div.dialog-status');
@@ -37,6 +49,9 @@ export function addonSection({ autoRefresh, onAutoRefresh, autoUpdate, onAutoUpd
   auto.checked = autoRefresh;
   const autoUpdateBox = el('input', { type: 'checkbox' });
   autoUpdateBox.checked = autoUpdate;
+  const weeklyBox = el('input', { type: 'checkbox' });
+  weeklyBox.checked = weeklyData;
+  const weeklyLine = el('div.dialog-status');
   const specList = el('div.addon-specs');
   const syncLine = el('div.dialog-status');
   const writeBtn = el('button.wow-btn.small', { title: 'Read the game folder again (addon version, your characters) and write the data for the addon' }, 'Rescan');
@@ -87,6 +102,8 @@ export function addonSection({ autoRefresh, onAutoRefresh, autoUpdate, onAutoUpd
         : [el('span.faint', 'Specs you look at in the app appear here and in the addon.')])
     );
 
+    setLine(weeklyLine, ...weeklyText(s));
+
     const chars = s.characters || [];
     if (s.syncing) setLine(syncLine, `Updating ${s.syncing.label}…`);
     else if (s.lastError) setLine(syncLine, s.lastError, 'bad');
@@ -128,6 +145,7 @@ export function addonSection({ autoRefresh, onAutoRefresh, autoUpdate, onAutoUpd
   );
   auto.addEventListener('change', () => onAutoRefresh(auto.checked));
   autoUpdateBox.addEventListener('change', () => onAutoUpdate(autoUpdateBox.checked));
+  weeklyBox.addEventListener('change', () => onWeeklyData(weeklyBox.checked));
 
   const stop = window.api.onAddonStatus(render);
   window.api.addonStatus().then((s) => status || render(s), () => {});
@@ -138,6 +156,8 @@ export function addonSection({ autoRefresh, onAutoRefresh, autoUpdate, onAutoUpd
     el('div.setting-row', folder, chooseBtn),
     el('div.setting-row.update-row', addonLine, installBtn),
     el('label.check-row', autoUpdateBox, el('span', 'Update the addon when this app comes with a newer one')),
+    el('label.check-row', weeklyBox, el('span', 'Add the weekly data for every spec (the same as on CurseForge, renewed every Wednesday)')),
+    weeklyLine,
     el('label.check-row', auto, el('span', "Keep my characters' specs fresh (updates their data once a day in the background)")),
     el('div.fb-label', 'Specs in the addon'),
     specList,
