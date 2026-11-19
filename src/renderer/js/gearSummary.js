@@ -150,6 +150,7 @@ function consumablesCard(c, N) {
       el('div.ov-sub', `${k.label} · ${k.used}/${c.players} use one`),
       k.options.length ? k.options.slice(0, 3).map((o) => consumableLine(o, k, c.players)) : el('div.faint', 'None seen'),
     ]),
+    c.incomplete ? el('div.warn', 'Some buffs could not be identified (the game data did not load). Refresh to try again.') : null,
     el('div.faint.ov-note', { title: CONSUMABLES_NOTE }, `From the logged runs of ${c.players} of ${c.total} players`)
   );
 }

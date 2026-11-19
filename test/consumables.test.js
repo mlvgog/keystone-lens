@@ -22,6 +22,7 @@ const cache = require('../src/main/cache');
 const raiderio = require('../src/main/sources/raiderio');
 const consumables = require('../src/main/consumables');
 const { buildView } = require('../src/main/views');
+const { specRecord } = require('../src/main/addonExport');
 const { session, auraInfo } = require('./helpers/session');
 
 const aura = (id, name, icon = 'x') => ({ id, name, icon, school: 1, rank: null, hasCooldown: false });
@@ -182,6 +183,7 @@ test('each logged player counts once per kind, with the consumable of most of th
   const c = view.consumables;
   assert.equal(c.players, 4, 'P5 and P6 have no logged run');
   assert.equal(c.total, 6);
+  assert.equal(c.incomplete, false);
   const kind = (key) => c.kinds.find((k) => k.key === key);
   assert.deepEqual(
     kind('flask').options.map((o) => [o.name, o.count, o.share]),
@@ -210,6 +212,12 @@ test('each logged player counts once per kind, with the consumable of most of th
   const dungeon = await buildView(session(), { dungeon: 9 }, {});
   assert.equal(dungeon.consumables.players, 1);
   assert.equal(dungeon.consumables.kinds[0].options[0].name, 'Flask of B');
+
+  // Buffs the game tables could not tell apart (offline): marked, and left out of the addon.
+  const offline = session();
+  delete offline.auraInfo[1002];
+  assert.equal((await buildView(offline, {}, {})).consumables.incomplete, true);
+  assert.equal((await specRecord(offline)).consumables, undefined);
 
   // Raid sessions come from Warcraft Logs: no consumables.
   const raid = session();

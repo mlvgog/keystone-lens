@@ -108,12 +108,14 @@ function unclassifiedAuras(entries, known = {}) {
  * The consumables of a group of players: `entries` are the players' runs ({ buffs } of
  * raiderio.pullBuffs, null for a run that was not logged), `info` = classifyAuras' result.
  * Each player counts once per kind, with the aura of that kind present at most of their pulls.
- * Returns { players: logged players, total: all players, kinds: [{ key, label, used, options:
- * [{ id, name, icon, items, stat, count, share }] }] }.
+ * Returns { players: logged players, total: all players, incomplete, kinds: [{ key, label, used,
+ * options: [{ id, name, icon, items, stat, count, share }] }] }. `incomplete`: some buffs could not
+ * be told apart yet (the game tables could not be loaded), so the counts may be too low.
  */
 function summarizeConsumables(entries, info = {}) {
   const logged = entries.filter((d) => d?.buffs?.pulls > 0);
   const players = logged.length;
+  const incomplete = logged.some((d) => d.buffs.auras.some((a) => !(a.id in info)));
   const kinds = KINDS.map((k) => {
     const counts = new Map();
     let used = 0;
@@ -142,7 +144,7 @@ function summarizeConsumables(entries, info = {}) {
       .sort((a, b) => b.count - a.count || String(a.name).localeCompare(String(b.name)));
     return { key: k.key, label: k.label, used, options };
   });
-  return { players, total: entries.length, kinds };
+  return { players, total: entries.length, incomplete, kinds };
 }
 
 module.exports = { KINDS, classifyAuras, unclassifiedAuras, summarizeConsumables, foodStat };

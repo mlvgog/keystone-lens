@@ -180,7 +180,8 @@ function statRatingsRecord(profile) {
 
 /** Flasks, food and augment runes of the players whose runs were logged (consumables.summarizeConsumables). */
 function consumablesRecord(c) {
-  if (!c?.players) return undefined;
+  // Not when some buffs could not be told apart: the shares would be too low.
+  if (!c?.players || c.incomplete) return undefined;
   const out = { n: c.players, used: {} };
   for (const k of c.kinds) {
     out.used[k.key] = k.used;
