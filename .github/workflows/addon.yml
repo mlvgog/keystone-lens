@@ -166,6 +166,12 @@ jobs:
           if grep -vqE '^(KeystoneLens|KeystoneLens_DB)/' <<<"$list"; then echo "Unexpected top-level entries"; exit 1; fi
           if grep -qE '(^|/)\.' <<<"$list"; then echo "Hidden files in the zip"; exit 1; fi
 
+      # The week's real data, read by the addon itself (Lua 5.1 VM, stand-in WoW API).
+      - name: Check the data in the addon
+        env:
+          SPECS: ${{ inputs.specs }}
+        run: node scripts/check-addon-data.js build/addon/KeystoneLens_DB/Data.lua --min-specs "$([ -n "$SPECS" ] && echo 1 || echo 20)"
+
       - uses: actions/upload-artifact@v4
         with:
           name: KeystoneLens-addon

@@ -9,6 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { buildAddonData, specList, parseArgs } = require('../scripts/build-addon-data');
+const { checkAddonData } = require('../scripts/check-addon-data');
 const { specRecord, readTocField } = require('../src/main/addonExport');
 const { session } = require('./helpers/session');
 const addon = require('./helpers/addon');
@@ -143,4 +144,25 @@ test('the build identifies itself and asks raider.io more gently than the app', 
   assert.match(http.userAgentString(), /^KeystoneLens\/[\d.]+ \(addon data build; \+https:\/\/github\.com\/mlvgog\/keystone-lens\)$/);
   http.configure({ context: 'desktop app' });
   assert.equal(http.userAgentString(), before);
+});
+
+test("the week's data file is checked in the addon before it is uploaded", async () => {
+  const out = tmp();
+  const res = await buildAddonData({ out, deps: stubDeps(), minPlayers: 1, minSpecs: 3, log: () => {} });
+  const data = fs.readFileSync(path.join(res.dir, 'Data.lua'), 'utf8');
+  const ok = checkAddonData(data, { minSpecs: 3 });
+  assert.deepEqual(ok.problems, []);
+  assert.deepEqual(ok.specs.map((s) => [s.specId, s.source, s.players, s.dungeons, s.dungeonsWithBuilds]), [
+    [63, 'bundle', 6, 1, 1],
+    [64, 'bundle', 6, 1, 1],
+    [261, 'bundle', 6, 1, 1],
+  ]);
+  assert.ok(ok.specs.every((s) => s.builds > 0 && s.talents > 0));
+
+  // Too few specs, a spec without builds, and a file the game can't read all fail the check.
+  assert.match(checkAddonData(data, { minSpecs: 20 }).problems.join('\n'), /Only 3 specs load in the addon \(at least 20 expected\)/);
+  const noBuilds = data.replace(/builds = \{/g, 'oldBuilds = {');
+  assert.match(checkAddonData(noBuilds).problems.join('\n'), /Spec 63: no builds/);
+  assert.throws(() => checkAddonData(data.replace('KeystoneLensBundledData.specs[63] =', 'KeystoneLensBundledData.specs[63] = = ')));
+  fs.rmSync(out, { recursive: true, force: true });
 });
