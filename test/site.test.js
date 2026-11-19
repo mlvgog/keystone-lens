@@ -154,3 +154,11 @@ test('the release summary is the first line of the notes, as plain text', () => 
   assert.equal(summaryOf(null), '');
   assert.ok(summaryOf('x'.repeat(400)).length <= 220);
 });
+
+test('the game addon links to its CurseForge page', () => {
+  for (const page of pages) {
+    const links = tags(read(page), 'a').filter((t) => /\sdata-curseforge\b/.test(t));
+    assert.ok(links.length >= 1, `${page} has no CurseForge link`);
+    for (const a of links) assert.match(a, /href="https:\/\/www\.curseforge\.com\/wow\/addons\/keystone-lens"/, `${page}: ${a}`);
+  }
+});
