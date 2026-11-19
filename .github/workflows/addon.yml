@@ -19,7 +19,7 @@ on:
     tags: ['addon-v*']
   schedule:
     - cron: '23 7 * * 3' # Wednesday: build and upload
-    - cron: '23 7 * * 0' # Sunday: only touch the data cache, which GitHub drops after 7 unused days
+    - cron: '23 7 * * 0,5' # Friday and Sunday: only touch the data cache, which GitHub drops after 7 unused days
   workflow_dispatch:
     inputs:
       upload:
@@ -42,9 +42,10 @@ env:
   CACHE_DIR: .addon-data-cache
 
 jobs:
-  # Restoring the cache counts as using it, so the weekly build finds last week's key snapshots.
+  # Restoring the cache counts as using it, so the weekly build finds last week's key snapshots,
+  # even when a Wednesday run fails.
   keep-cache:
-    if: github.event.schedule == '23 7 * * 0'
+    if: github.event.schedule == '23 7 * * 0,5'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/cache/restore@v4
@@ -54,11 +55,19 @@ jobs:
           restore-keys: addon-data-
 
   package:
-    if: github.event.schedule != '23 7 * * 0'
+    if: github.event.schedule != '23 7 * * 0,5'
     runs-on: ubuntu-latest
     timeout-minutes: 340
     steps:
       - uses: actions/checkout@v4
+
+      # First, so that even a run that fails later counts as using the cache.
+      - name: Restore the data cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CACHE_DIR }}
+          key: addon-data-${{ github.run_id }}
+          restore-keys: addon-data-
 
       - name: Check that the tag matches the addon version
         if: startsWith(github.ref, 'refs/tags/')
@@ -69,10 +78,23 @@ jobs:
             exit 1
           fi
 
+      # Ubuntu's package servers are sometimes unreachable from the runner. A scheduled run then
+      # skips the lint (CI linted the code on main) rather than skipping a week's data.
       - name: Lint with Lua 5.1
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lua5.1 lua-check
+          installed=
+          for attempt in 1 2 3; do
+            if sudo apt-get update && sudo apt-get install -y lua5.1 lua-check; then installed=1; break; fi
+            echo "Installing luacheck failed (attempt $attempt)"
+            sleep 60
+          done
+          if [ -z "$installed" ]; then
+            if [ "$GITHUB_EVENT_NAME" = schedule ]; then
+              echo "::warning::Could not install luacheck; skipping the lint for this scheduled run"
+              exit 0
+            fi
+            exit 1
+          fi
           luacheck addon/KeystoneLens --config addon/.luacheckrc
 
       - uses: actions/setup-node@v4
@@ -94,13 +116,6 @@ jobs:
           if [ "$HAS_TOKEN" = true ] && [ -n "$project" ] && [ "$WANTED" = true ] && [ -z "$SPECS" ]; then upload=true; fi
           echo "upload=$upload" >> "$GITHUB_OUTPUT"
           echo "Upload to CurseForge: $upload"
-
-      - name: Restore the data cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ env.CACHE_DIR }}
-          key: addon-data-${{ github.run_id }}
-          restore-keys: addon-data-
 
       # Key snapshots stay in the cache, so a run that hits the time limit continues next time.
       - name: Build this week's data
