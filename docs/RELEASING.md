@@ -1,9 +1,9 @@
 # Releasing
 
-Releases are built by GitHub Actions ([`release.yml`](../.github/workflows/release.yml)) when a version tag is pushed. The workflow:
+Releases are built by GitHub Actions ([`release.yml`](../.github/workflows/release.yml)) when a version tag is pushed, or when the workflow is run by hand (see below). The workflow:
 
 1. runs the tests;
-2. checks that the tag matches `version` in `package.json`;
+2. checks that the tag (or the version given) matches `version` in `package.json`;
 3. builds the installer and the portable exe on Windows;
 4. checks that `latest.yml` (for the in-app updater) names the new installer;
 5. writes `SHA256SUMS.txt`;
@@ -34,6 +34,12 @@ So every release must contain `latest.yml` and `KeystoneLens-Setup-<version>.exe
    ```
 
 4. **Wait for the Release workflow** under the repository's **Actions** tab (about 5 minutes). The release appears under **Releases** when it finishes.
+
+### Releasing without pushing a tag
+
+The Release workflow can also be started by hand: **Actions → Release → Run workflow**, on `main`, with the version in `package.json` (for example `1.3.0`). It checks that `main` has that version and that it has no tag yet, builds and tests as usual, and creates the tag `v<version>` on that commit when it publishes the release. So a release only needs the version bump and the release notes merged into `main`.
+
+This is also how Claude Code releases from a cloud session, where pushing tags is not allowed: it starts this workflow through the GitHub connector. Anyone who can run workflows in the repository can publish a release this way, and every installed app updates to it.
 
 To review a release before it goes out, set `draft: true` in `release.yml` and publish the draft from **Releases** yourself. The updater ignores drafts, so nobody gets it until you publish.
 

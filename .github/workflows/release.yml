@@ -1,10 +1,18 @@
 name: Release
 
-# Push a tag like v1.0.0 (matching "version" in package.json) to build the Windows
-# installer and portable exe and publish them as a GitHub release.
+# Builds the Windows installer and portable exe and publishes them as a GitHub release.
+# Start it either way:
+# - push a tag like v1.0.0 (matching "version" in package.json);
+# - or Actions → Release → Run workflow on main, with the version in package.json. The release
+#   then creates the tag on that commit. This lets a release start without pushing a tag.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, as in package.json on main (for example 1.3.0)
+        required: true
 
 permissions:
   contents: write
@@ -19,17 +27,31 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
-      - run: npm test
 
-      - name: Check that the tag matches package.json
+      # The tag must match package.json. Run by hand: only on main, and only a version that has
+      # no tag yet.
+      - name: Which release
+        id: tag
         shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           version="$(node -p "require('./package.json').version")"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $version"
-            exit 1
+          if [ "$EVENT" = workflow_dispatch ]; then
+            if [ "$GITHUB_REF" != refs/heads/main ]; then echo "Run the Release workflow on main"; exit 1; fi
+            if [ "$INPUT_VERSION" != "$version" ]; then echo "package.json on main has version $version, not $INPUT_VERSION"; exit 1; fi
+            tag="v$version"
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then echo "$tag is already released"; exit 1; fi
+          else
+            tag="$GITHUB_REF_NAME"
+            if [ "v$version" != "$tag" ]; then echo "Tag $tag does not match package.json version $version"; exit 1; fi
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Releasing $tag from $GITHUB_SHA"
+
+      - run: npm ci
+      - run: npm test
 
       - name: Build installer and portable exe
         run: npx electron-builder --win nsis portable --publish never
@@ -56,14 +78,19 @@ jobs:
 
       - name: Release notes
         shell: bash
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          notes="docs/release-notes/${GITHUB_REF_NAME}.md"
-          if [ -f "$notes" ]; then cp "$notes" release-notes.md; else echo "Release ${GITHUB_REF_NAME}" > release-notes.md; fi
+          notes="docs/release-notes/${TAG}.md"
+          if [ -f "$notes" ]; then cp "$notes" release-notes.md; else echo "Release ${TAG}" > release-notes.md; fi
 
       # Published right away; notes come from docs/release-notes/<tag>.md plus the commit list.
-      # latest.yml and the blockmap are for the in-app updater.
+      # latest.yml and the blockmap are for the in-app updater. A tag that does not exist yet (run
+      # by hand) is created on this commit.
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           draft: false
           body_path: release-notes.md
           generate_release_notes: true
