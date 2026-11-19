@@ -17,7 +17,7 @@ for _, name in ipairs({
   "SetFrameLevel", "SetFrameStrata", "SetHeight", "SetItemByID", "SetJustifyH", "SetMovable", "SetClampedToScreen",
   "SetPoint", "SetScrollChild", "SetSize", "SetTexture", "SetWidth", "StartMoving", "StopMovingOrSizing", "UnlockHighlight",
   "SetToplevel", "SetStatusBarTexture", "SetStatusBarColor", "SetColorTexture", "SetBackdropColor", "SetJustifyV",
-  "SetHighlightTexture",
+  "SetHighlightTexture", "SetDesaturated",
 }) do
   Widget[name] = noop
 end
@@ -288,6 +288,9 @@ C_Item.GetItemGemID = function(link, index)
   return gem and gem > 0 and gem or nil
 end
 C_Item.GetItemQualityByID = function() return 4 end
+-- Items in your bags: __bags[itemID] = count.
+__bags = {}
+C_Item.GetItemCount = function(id) return __bags[id] or 0 end
 C_Item.GetItemQualityColor = function() return 0.64, 0.21, 0.93 end
 PlayerSpellsUtil = {
   OpenToClassTalentsTab = function()

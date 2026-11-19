@@ -88,6 +88,7 @@ const KIND_SOURCE = {
   wclCharacter: 'Warcraft Logs',
   wclRaid: 'Warcraft Logs',
   enchantName: 'wago.tools',
+  consumable: 'wago.tools',
   analysis: 'Analyses (built locally)',
 };
 const EMPTY_TOTALS = { requests: 0, bytes: 0, errors: 0, retries: 0, ms: 0, avgMs: 0 };

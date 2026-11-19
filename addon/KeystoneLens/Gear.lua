@@ -1,5 +1,6 @@
 -- Keystone Lens: the Overview tab's character pane: the top players' gear slot by slot, a flyout
--- with every option per slot, their secondary stats next to yours, and their races (Races.lua).
+-- with every option per slot, their secondary stats next to yours, their consumables
+-- (Consumables.lua) and their races (Races.lua).
 local _, ns = ...
 
 local SLOT = 37 -- slot button size
@@ -540,6 +541,10 @@ function ns.CreateGearView(parent)
   end)
   view.stats = createStats(view, centreWidth)
   view.stats:SetPoint("TOP", view.build, "BOTTOM", 0, -14)
+  -- Under the stats, above the weapons.
+  view.consumables = ns.CreateConsumableStrip(view)
+  view.consumables:SetPoint("TOPLEFT", view.stats, "BOTTOMLEFT", 0, -4)
+  view.consumables:SetPoint("TOPRIGHT", view.stats, "BOTTOMRIGHT", 0, -4)
 
   view.races = ns.CreateRaceStrip(view)
   view.races:SetPoint("BOTTOMLEFT", view, "BOTTOMLEFT", 14, 8)
@@ -568,6 +573,7 @@ function ns.RenderGear(view, rec, specID)
   end
   view.empty:SetShown(not show)
   if not rec then
+    view.consumables:Hide()
     return
   end
   local mine = ownClass and ns.MyGear() or nil
@@ -597,5 +603,6 @@ function ns.RenderGear(view, rec, specID)
     view.build.text:SetText(string.format("|cffffd100%d popular builds|r", #v.builds))
   end
   setStats(view.stats, rec, ownClass and ns.MyGearStats() or nil, ownSpec)
+  ns.RenderConsumables(view.consumables, rec)
   ns.RenderRaces(view.races, rec)
 end

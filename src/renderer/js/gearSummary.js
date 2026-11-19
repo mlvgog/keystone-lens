@@ -1,5 +1,7 @@
 import { el, iconImg, pct, qualityColor, fmtDelta, relDate } from './util.js';
 import { raceCard } from './races.js';
+import { attachTooltip } from './tooltip.js';
+import { itemRef, spellRef } from './wowheadTooltip.js';
 
 let open = true; // the Overview stays expanded/collapsed across re-renders
 
@@ -113,6 +115,45 @@ function tierCard(summary, N) {
   );
 }
 
+const CONSUMABLES_NOTE = 'From the buffs at the boss pulls of runs logged with the Raider.IO client. Potions and weapon oils are not recorded there.';
+
+/** One flask / food / rune option: icon, name and share, with the game's tooltip on hover. */
+function consumableLine(o, kind, players) {
+  const line = el('div.ov-line', el('span', iconImg(o.icon, { cls: 'mini-icon' }), el('span', ` ${o.name}`)), el('span.num', pct(o.share)));
+  attachTooltip(
+    line,
+    () =>
+      el(
+        'div',
+        el('div.tt-title', o.name),
+        el('div.tt-gold', `Used by ${o.count} / ${players} top players (${pct(o.share)})`),
+        kind.key === 'food' ? el('div.tt-grey', `${o.stat === 'Primary stat' ? 'Feasts and other food that raise the primary stat' : `Food that raises ${o.stat}`}`) : null
+      ),
+    // The item's tooltip for flasks and runes, the buff's for food (many dishes give it).
+    { wowhead: () => (o.items?.length ? itemRef({ id: o.items[o.items.length - 1] }) : spellRef(o.id)) }
+  );
+  return line;
+}
+
+/** Flasks, food and augment runes of the players whose runs were logged (null in raid mode). */
+function consumablesCard(c, N) {
+  if (!c) return null;
+  if (!c.players) {
+    return card(
+      'Consumables',
+      el('div.faint', `None of these ${N} players' runs were logged with the Raider.IO client, so their flasks and food are not known.`)
+    );
+  }
+  return card(
+    'Consumables',
+    c.kinds.map((k) => [
+      el('div.ov-sub', `${k.label} · ${k.used}/${c.players} use one`),
+      k.options.length ? k.options.slice(0, 3).map((o) => consumableLine(o, k, c.players)) : el('div.faint', 'None seen'),
+    ]),
+    el('div.faint.ov-note', { title: CONSUMABLES_NOTE }, `From the logged runs of ${c.players} of ${c.total} players`)
+  );
+}
+
 function trendsCard(ctx) {
   const { view, tree } = ctx;
   const t = view.trends;
@@ -145,6 +186,7 @@ export function renderGearOverview(ctx) {
     view.trends ? trendsCard(ctx) : null,
     statCard(view.statProfile, ctx.character?.statProfile),
     raceCard(view.races, ctx.meta, ctx.character),
+    consumablesCard(view.consumables, N),
     enchantCard(s, N),
     gemCard(s, N),
     tierCard(s, N)

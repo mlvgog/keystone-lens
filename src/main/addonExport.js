@@ -15,6 +15,8 @@
  *   embellishments: [{ id, name, n }], stats: { crit, haste, mastery, vers } (share of their secondary stats),
  *   statRatings: { crit, haste, mastery, vers } (average rating from gear and gems, enchants not counted),
  *   races: [{ key, id (a game race id), ids (all of the race's ids), name, n, faction, spells: [{ id, name }] (racials of this class) }],
+ *   consumables: { n (players whose run was logged with the Raider.IO client), used: { flask, food, rune } (counts),
+ *     flask|food|rune: [{ id (the buff's spell id), name, icon, items (item ids giving it), n }] },
  *   dungeonList: [{ id, name, short, map }],
  *   dungeons: { [zoneId]: { sample, hero, talents, builds } } }
  */
@@ -45,6 +47,7 @@ const TOP_ITEMS = 8;
 const TOP_ENCHANTS = 3;
 const TOP_GEMS = 6;
 const MAX_BUILDS = 6;
+const TOP_CONSUMABLES = 3;
 
 const round = (x, digits = 3) => Math.round(x * 10 ** digits) / 10 ** digits;
 
@@ -175,6 +178,23 @@ function statRatingsRecord(profile) {
   return Object.fromEntries(profile.stats.map((s) => [s.key, Math.round(s.avg)]));
 }
 
+/** Flasks, food and augment runes of the players whose runs were logged (consumables.summarizeConsumables). */
+function consumablesRecord(c) {
+  if (!c?.players) return undefined;
+  const out = { n: c.players, used: {} };
+  for (const k of c.kinds) {
+    out.used[k.key] = k.used;
+    out[k.key] = k.options.slice(0, TOP_CONSUMABLES).map((o) => ({
+      id: o.id,
+      name: o.name,
+      icon: o.icon || undefined,
+      items: o.items?.length ? o.items : undefined,
+      n: o.count,
+    }));
+  }
+  return out;
+}
+
 /** The races the players play, with each race's racials for the spec's class (when they could be loaded). */
 function racesRecord(races, racials) {
   if (!races?.list?.length) return undefined;
@@ -230,6 +250,7 @@ async function specRecord(session, { racials = null } = {}) {
     stats: statsRecord(view.statProfile),
     statRatings: statRatingsRecord(view.statProfile),
     races: racesRecord(view.races, racialsByRace),
+    consumables: consumablesRecord(view.consumables),
     dungeonList: meta.dungeons.map((d) => ({ id: d.id, name: d.name, short: d.shortName || undefined, map: d.challengeModeId || undefined })),
     dungeons: {},
   };

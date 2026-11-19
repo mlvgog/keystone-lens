@@ -208,33 +208,75 @@ function trimLoadout(tl) {
   };
 }
 
-/** Run snapshot: who was in the group, with their talents and gear at that time. Cached forever. */
+/**
+ * The buffs each player had at the boss pulls of a run logged with the Raider.IO client
+ * (`logged_details`): { [characterId]: { pulls, auras: [{ id, name, icon, pulls }] } }, or null for a
+ * run that was not logged. Raider.IO lists the "interesting" auras only (raid buffs, flasks, food,
+ * augment runes and the like); consumables.js picks the consumables out of them.
+ */
+function pullBuffs(logged) {
+  const encounters = logged?.encounters;
+  if (!Array.isArray(encounters) || !encounters.length) return null;
+  const out = {};
+  for (const e of encounters) {
+    for (const m of e?.roster || []) {
+      const id = m?.character?.id;
+      if (!id) continue;
+      const p = (out[id] ||= { pulls: 0, auras: [] });
+      p.pulls++;
+      for (const a of m.interestingAuras || []) {
+        if (!a?.id) continue;
+        const known = p.auras.find((x) => x.id === a.id);
+        if (known) known.pulls++;
+        else p.auras.push({ id: a.id, name: a.name || null, icon: a.icon || null, pulls: 1 });
+      }
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** Version of the stored run snapshots; older ones are downloaded again. 2: buffs at boss pulls. */
+const RUN_VERSION = 2;
+
+function parseRunDetails(id, d) {
+  const buffs = pullBuffs(d.logged_details);
+  return {
+    v: RUN_VERSION,
+    id,
+    completedAt: d.completed_at,
+    level: d.mythic_level,
+    score: d.score,
+    logged: !!buffs,
+    dungeon: { name: d.dungeon?.name, shortName: d.dungeon?.short_name, zoneId: d.dungeon?.id ?? null },
+    roster: (d.roster || []).map((r) => ({
+      characterId: r.character?.id,
+      name: r.character?.name,
+      specId: r.character?.spec?.id,
+      talents: trimLoadout(r.character?.talentLoadout),
+      itemLevel: r.items?.item_level_equipped ?? null,
+      items: Object.fromEntries(Object.entries(r.items?.items || {}).map(([slot, it]) => [slot, trimItem(it)])),
+      buffs: (buffs && buffs[r.character?.id]) || null,
+    })),
+  };
+}
+
+/**
+ * Run snapshot: who was in the group, with their talents and gear at that time, and for logged
+ * runs the buffs they had at each boss pull. Cached forever (per RUN_VERSION).
+ */
 async function getRunDetails({ season, id }, { signal } = {}) {
   const url = `${BASE}/api/v1/mythic-plus/run-details?season=${encodeURIComponent(season)}&id=${id}`;
-  return cache.cached('run', url, async () => {
-    let d;
-    try {
-      d = await fetchJson(url, { signal });
-    } catch (err) {
-      if (err.status === 400 || err.status === 404) return { id, missing: true, roster: [] };
-      throw err;
-    }
-    return {
-      id,
-      completedAt: d.completed_at,
-      level: d.mythic_level,
-      score: d.score,
-      dungeon: { name: d.dungeon?.name, shortName: d.dungeon?.short_name, zoneId: d.dungeon?.id ?? null },
-      roster: (d.roster || []).map((r) => ({
-        characterId: r.character?.id,
-        name: r.character?.name,
-        specId: r.character?.spec?.id,
-        talents: trimLoadout(r.character?.talentLoadout),
-        itemLevel: r.items?.item_level_equipped ?? null,
-        items: Object.fromEntries(Object.entries(r.items?.items || {}).map(([slot, it]) => [slot, trimItem(it)])),
-      })),
-    };
-  });
+  const hit = await cache.read('run', url);
+  if (hit?.v === RUN_VERSION) return hit;
+  let value;
+  try {
+    value = parseRunDetails(id, await fetchJson(url, { signal }));
+  } catch (err) {
+    if (err.status !== 400 && err.status !== 404) throw err;
+    value = { v: RUN_VERSION, id, missing: true, roster: [] };
+  }
+  await cache.write('run', url, value);
+  return value;
 }
 
 /**
@@ -311,6 +353,8 @@ module.exports = {
   parseMythicPlusProfile,
   specScore,
   getRunDetails,
+  parseRunDetails,
+  pullBuffs,
   getCharacter,
   slugifyRealm,
   profileUrl,

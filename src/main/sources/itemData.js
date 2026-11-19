@@ -239,4 +239,4 @@ async function describeVariants(variants, { signal } = {}) {
   return out;
 }
 
-module.exports = { describeVariants, getEnchantNames, itemStats, isEmbellished, parseSimcTable, getScaleTables };
+module.exports = { describeVariants, getEnchantNames, itemStats, isEmbellished, parseSimcTable, getScaleTables, rowsById, cachedById };

@@ -1,8 +1,8 @@
 ## Interface: 120105, 120107
 ## Title: Keystone Lens
-## Notes: What the top Mythic+ players of your spec run: talent pick rates on your talent tree, popular builds, gear, enchants, gems and races. Comes with weekly data from Raider.IO; the free Keystone Lens desktop app adds fresher data.
+## Notes: What the top Mythic+ players of your spec run: talent pick rates on your talent tree, popular builds, gear, enchants, gems, flasks, food, augment runes and races. Comes with weekly data from Raider.IO; the free Keystone Lens desktop app adds fresher data.
 ## Author: Gog
-## Version: 1.2.1
+## Version: 1.3.0
 ## SavedVariables: KeystoneLensDB
 ## OptionalDeps: KeystoneLens_Data, KeystoneLens_DB
 ## IconTexture: Interface\Icons\inv_relics_hourglass
@@ -19,6 +19,7 @@ Character.lua
 Tooltips.lua
 Talents.lua
 Gear.lua
+Consumables.lua
 Races.lua
 Builds.lua
 Panel.lua

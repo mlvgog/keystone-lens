@@ -74,6 +74,28 @@ test('races are exported with the racials of the spec\'s class', async () => {
   assert.equal((await specRecord(s, { racials })).races, undefined);
 });
 
+test('consumables are exported for the players whose runs were logged', async () => {
+  const r = await specRecord(session());
+  assert.deepEqual(r.consumables, {
+    n: 4,
+    used: { flask: 4, food: 4, rune: 3 },
+    flask: [
+      { id: 1001, name: 'Flask of A', icon: 'inv_flask_a', items: [5001, 5002], n: 2 },
+      { id: 1002, name: 'Flask of B', icon: 'inv_flask_b', items: [5003], n: 2 },
+    ],
+    food: [
+      { id: 2001, name: 'Haste food', icon: 'spell_misc_food', items: undefined, n: 3 },
+      { id: 2003, name: 'Primary stat food', icon: 'spell_misc_food', items: undefined, n: 1 },
+    ],
+    rune: [{ id: 3001, name: 'Void-Touched Augment Rune', icon: 'inv_rune', items: [6001], n: 3 }],
+  });
+
+  // No logged runs: no consumables (the addon then hides them).
+  const s = session();
+  for (const p of s.players) p.main.buffs = null;
+  assert.equal((await specRecord(s)).consumables, undefined);
+});
+
 test('raid sessions are never exported', async () => {
   const s = session();
   s.meta.mode = 'raid';
@@ -98,6 +120,8 @@ test('the data file loads in Lua with every spec', async () => {
   assert.equal(lua.evaluate(L, `${DATA_GLOBAL}.specs[64].dungeons[9].sample`), 3);
   assert.equal(lua.evaluate(L, `${DATA_GLOBAL}.specs[64].races[1].name`), 'Night Elf');
   assert.equal(lua.evaluate(L, `${DATA_GLOBAL}.specs[64].races[1].id`), 4);
+  assert.equal(lua.evaluate(L, `${DATA_GLOBAL}.specs[64].consumables.flask[1].items[2]`), 5002);
+  assert.equal(lua.evaluate(L, `${DATA_GLOBAL}.specs[64].consumables.food[1].items`), null);
 });
 
 test('the data addon copies the Interface value of the installed addon and is written whole', async () => {

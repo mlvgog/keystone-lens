@@ -1,7 +1,8 @@
 # Keystone Lens addon
 
-## 1.2.1
+## 1.3.0
 
+- **Consumables:** under the secondary stats, `/kl` now shows the flask, food and augment rune the top players use most, with their share. Hover one for the other options, and for whether you carry it: a tick shows when the top flask or rune is in your bags. The data comes from the buffs Raider.IO records at the boss pulls of runs logged with its client, so it covers the players whose runs were logged (most of the top players). Potions and weapon oils are not recorded there. Older data without consumables hides the row.
 - **Ready for patch 12.1.7:** the addon declares both 12.1.5 and 12.1.7, so it won't show as out of date when the patch goes live.
 - **The same version everywhere:** from now on the addon on CurseForge is always the one in the latest Keystone Lens app, and the app installs the same weekly data for every spec as CurseForge. Using the app and the CurseForge addon together works: each keeps its own folders current, and per spec you see the newer data.
 

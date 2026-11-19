@@ -3,7 +3,7 @@
 /**
  * A small synthetic Mythic+ analysis (the shape collector.analyze returns): 6 players of one
  * spec with a choice node, a multi-rank node and two hero trees, gear with enchants and gems,
- * races (one unknown), and one of two dungeons loaded.
+ * races (one unknown), consumables at boss pulls (four logged runs), and one of two dungeons loaded.
  */
 
 const tree = {
@@ -41,8 +41,22 @@ const item = (id, ilvl, extra = {}) => ({ id, ilvl, name: `Item ${id}`, icon: 'x
 const ench = (id, name) => ({ id, name: `Enchant Ring - ${name}`, icon: null });
 const gem = (id, name) => ({ id, name, icon: null });
 
+/** Buffs at boss pulls (raiderio.pullBuffs): [[spellId, pulls]] out of `pulls`. */
+const buffs = (pulls, auras) => ({ pulls, auras: auras.map(([id, n]) => ({ id, name: `Aura ${id}`, icon: 'x', pulls: n })) });
+
+// What the auras are (consumables.classifyAuras).
+const auraInfo = {
+  465: null, // Devotion Aura: not a consumable
+  1001: { kind: 'flask', name: 'Flask of A', icon: 'inv_flask_a', items: [5001, 5002] },
+  1002: { kind: 'flask', name: 'Flask of B', icon: 'inv_flask_b', items: [5003] },
+  2001: { kind: 'food', name: 'Haste food', icon: 'spell_misc_food', items: [], stat: 'Haste' },
+  2002: { kind: 'food', name: 'Haste food', icon: 'spell_misc_food', items: [], stat: 'Haste' },
+  2003: { kind: 'food', name: 'Primary stat food', icon: 'spell_misc_food', items: [], stat: 'Primary stat' },
+  3001: { kind: 'rune', name: 'Void-Touched Augment Rune', icon: 'inv_rune', items: [6001] },
+};
+
 /** picks: [nodeId, entryId, rank] */
-function entry(picks, hero, items, loadoutText) {
+function entry(picks, hero, items, loadoutText, pullBuffs = null) {
   return {
     run: { id: 1, dungeon: 'Somewhere', level: 20, score: 400, completedAt: '2026-10-10T00:00:00Z', version: '12.1.0' },
     fallback: false,
@@ -53,6 +67,7 @@ function entry(picks, hero, items, loadoutText) {
     },
     items,
     itemLevel: 330,
+    buffs: pullBuffs,
   };
 }
 
@@ -78,10 +93,26 @@ function gearB() {
 
 function session() {
   const players = [
-    { name: 'P1', race: 'nightelf', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: { 9: entry(buildB, 41, gearB(), 'STRB') } },
-    { name: 'P2', race: 'nightelf', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: { 9: entry(buildB, 41, gearB(), 'STRB') } },
-    { name: 'P3', race: 'dwarf', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: { 9: entry(buildA, 40, gearA(), 'STRA') } },
-    { name: 'P4', race: null, main: entry(buildB, 41, gearB(), 'STRB'), dungeons: { 9: null } },
+    {
+      name: 'P1',
+      race: 'nightelf',
+      main: entry(buildA, 40, gearA(), 'STRA', buffs(4, [[465, 4], [1001, 4], [2001, 4], [3001, 4]])),
+      dungeons: { 9: entry(buildB, 41, gearB(), 'STRB', buffs(3, [[1002, 3], [2003, 3]])) },
+    },
+    {
+      name: 'P2',
+      race: 'nightelf',
+      // Switched flasks after the first boss: counts with Flask of B.
+      main: entry(buildA, 40, gearA(), 'STRA', buffs(3, [[1001, 1], [1002, 2], [2002, 3], [3001, 3]])),
+      dungeons: { 9: entry(buildB, 41, gearB(), 'STRB') },
+    },
+    {
+      name: 'P3',
+      race: 'dwarf',
+      main: entry(buildA, 40, gearA(), 'STRA', buffs(2, [[1001, 2], [2003, 2]])),
+      dungeons: { 9: entry(buildA, 40, gearA(), 'STRA') },
+    },
+    { name: 'P4', race: null, main: entry(buildB, 41, gearB(), 'STRB', buffs(4, [[1002, 4], [2001, 4], [3001, 4]])), dungeons: { 9: null } },
     { name: 'P5', race: 'pandaren', main: entry(buildB, 41, gearB(), 'STRB'), dungeons: {} },
     { name: 'P6', race: 'nightelf', main: entry(buildA, 40, gearA(), 'STRA'), dungeons: {} },
   ].map((p, i) => ({ rank: i + 1, realm: 'R', realmSlug: 'r', region: 'eu', score: 3000 - i, links: {}, candidates: [], ...p }));
@@ -117,7 +148,8 @@ function session() {
       '200||334': { stats: { crit: 600, haste: 600, mastery: 0, vers: 0 } },
     },
     itemSources: {},
+    auraInfo: { ...auraInfo },
   };
 }
 
-module.exports = { session, tree };
+module.exports = { session, tree, auraInfo };

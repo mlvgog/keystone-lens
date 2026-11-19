@@ -152,12 +152,18 @@ test("the week's data file is checked in the addon before it is uploaded", async
   const data = fs.readFileSync(path.join(res.dir, 'Data.lua'), 'utf8');
   const ok = checkAddonData(data, { minSpecs: 3 });
   assert.deepEqual(ok.problems, []);
-  assert.deepEqual(ok.specs.map((s) => [s.specId, s.source, s.players, s.dungeons, s.dungeonsWithBuilds]), [
-    [63, 'bundle', 6, 1, 1],
-    [64, 'bundle', 6, 1, 1],
-    [261, 'bundle', 6, 1, 1],
+  assert.deepEqual(ok.warnings, []);
+  assert.deepEqual(ok.specs.map((s) => [s.specId, s.source, s.players, s.dungeons, s.dungeonsWithBuilds, s.consumables]), [
+    [63, 'bundle', 6, 1, 1, 4],
+    [64, 'bundle', 6, 1, 1, 4],
+    [261, 'bundle', 6, 1, 1, 4],
   ]);
   assert.ok(ok.specs.every((s) => s.builds > 0 && s.talents > 0));
+
+  // Specs without consumables (no logged runs) are reported, but don't stop the upload.
+  const noConsumables = checkAddonData(data.replace(/consumables = \{/g, 'oldConsumables = {'), { minSpecs: 3 });
+  assert.deepEqual(noConsumables.problems, []);
+  assert.deepEqual(noConsumables.warnings, ['No consumables for 3 of 3 specs: 63, 64, 261']);
 
   // Too few specs, a spec without builds, and a file the game can't read all fail the check.
   assert.match(checkAddonData(data, { minSpecs: 20 }).problems.join('\n'), /Only 3 specs load in the addon \(at least 20 expected\)/);
