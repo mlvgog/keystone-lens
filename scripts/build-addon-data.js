@@ -92,6 +92,11 @@ async function buildAddonData({ out, only = null, maxMissing = 3, minPlayers = M
       records[rec.specId] = rec;
       log(`[${i + 1}/${specs.length}] ${label}: ${rec.sample} players, ${Object.keys(rec.dungeons || {}).length} dungeons (${Math.round((Date.now() - started) / 1000)}s)`);
     } catch (err) {
+      if (err.code === 'NO_PLAYERS') {
+        skipped.push({ specId: opts.specId, label, players: 0 });
+        log(`[${i + 1}/${specs.length}] ${label}: left out, no players in this season's top keys`);
+        continue;
+      }
       failed.push({ specId: opts.specId, label, error: err.message });
       log(`[${i + 1}/${specs.length}] ${label}: FAILED: ${err.message}`);
     }

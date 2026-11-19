@@ -260,7 +260,11 @@ async function analyze(opts, { signal, onProgress, force = false, allowStale = f
       `${discovery.players.length} ${specName} players in ${discovery.pagesRead} of ${maxPages} pages of top keys`
     )
   );
-  if (!discovery.players.length) throw new Error(`No ${specName} ${className} players were found in ${season.name} top keys on raider.io (${regionName}).`);
+  if (!discovery.players.length) {
+    const err = new Error(`No ${specName} ${className} players were found in ${season.name} top keys on raider.io (${regionName}).`);
+    err.code = 'NO_PLAYERS';
+    throw err;
+  }
 
   const getRun = runGetter(season.slug, signal);
 

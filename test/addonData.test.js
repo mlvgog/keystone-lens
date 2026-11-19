@@ -27,7 +27,7 @@ const CLASSES = [
   { classSlug: 'rogue', className: 'Rogue', color: '#FFF468', specs: [{ specId: 261, specSlug: 'subtlety', specName: 'Subtlety', icon: 's' }] },
 ];
 
-function stubDeps({ fail = [] } = {}) {
+function stubDeps({ fail = [], none = [] } = {}) {
   const calls = { analyze: [], loadDungeon: [] };
   return {
     calls,
@@ -35,6 +35,7 @@ function stubDeps({ fail = [] } = {}) {
     analyze: async (opts) => {
       calls.analyze.push(opts);
       if (fail.includes(opts.specId)) throw new Error('raider.io answered 500');
+      if (none.includes(opts.specId)) throw Object.assign(new Error(`No ${opts.specName} players were found`), { code: 'NO_PLAYERS' });
       const s = session();
       return { session: { ...s, meta: { ...s.meta, specId: opts.specId, specName: opts.specName, className: opts.className } } };
     },
@@ -108,6 +109,12 @@ test('specs hardly played in top keys are left out, but a nearly empty week is n
   assert.deepEqual(res.skipped.map((x) => [x.label, x.players]), [['Fire Mage', 6], ['Frost Mage', 6], ['Subtlety Rogue', 6]]);
   assert.deepEqual(res.failed, []);
   assert.ok(logs.some((l) => /Fire Mage: left out, only 6 players in this season's top keys/.test(l)));
+
+  // A spec with no players at all in the top keys (the collector says NO_PLAYERS) is left out too.
+  const none = await buildAddonData({ out, deps: stubDeps({ none: [63] }), minSpecs: 2, maxMissing: 0, log: (l) => logs.push(l) });
+  assert.deepEqual(none.skipped, [{ specId: 63, label: 'Fire Mage', players: 0 }]);
+  assert.deepEqual(none.failed, []);
+  assert.ok(logs.some((l) => /Fire Mage: left out, no players in this season's top keys/.test(l)));
 
   // The default minimum is 5 players, so these 6-player specs are built.
   const ok = await buildAddonData({ out, deps: stubDeps(), minSpecs: 3, log: () => {} });
