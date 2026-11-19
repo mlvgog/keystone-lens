@@ -10,7 +10,7 @@
 const fs = require('fs');
 const addon = require('../test/helpers/addon');
 
-// Per spec: specID|source|players|builds|talents|dungeons|dungeons with builds
+// Per spec: specID|source|players|builds|talents|dungeons|dungeons with builds|players with consumables
 const SUMMARY = `(function()
   local out = {}
   for _, s in ipairs(__ns:AvailableSpecs()) do
@@ -23,12 +23,19 @@ const SUMMARY = `(function()
     for _, d in ipairs(dungeons) do
       if #(__ns.View(rec, d.id).builds or {}) > 0 then withBuilds = withBuilds + 1 end
     end
-    out[#out + 1] = table.concat({ s.specID, source, rec.sample or 0, #(all.builds or {}), talents, #dungeons, withBuilds }, "|")
+    -- Addons before 1.3.0 (the latest release may still be one) have no consumables.
+    local consumables = __ns.ConsumableRows and __ns.ConsumableRows(rec)[1]
+    out[#out + 1] = table.concat({ s.specID, source, rec.sample or 0, #(all.builds or {}), talents, #dungeons, withBuilds,
+      consumables and consumables.players or 0 }, "|")
   end
   return table.concat(out, ";")
 end)()`;
 
-/** { specs: [{ specId, source, players, builds, talents, dungeons, dungeonsWithBuilds }], problems: [] } */
+/**
+ * { specs: [{ specId, source, players, builds, talents, dungeons, dungeonsWithBuilds, consumables }],
+ *   problems: [], warnings: [] }. Missing consumables are a warning only: they depend on how many of
+ * the players' runs were logged with the Raider.IO client.
+ */
 function checkAddonData(text, { minSpecs = 1 } = {}) {
   const problems = [];
   const L = addon.loadAddon({ before: [text] });
@@ -36,8 +43,17 @@ function checkAddonData(text, { minSpecs = 1 } = {}) {
   const summary = String(addon.evaluate(L, SUMMARY) || '');
   const specs = summary
     ? summary.split(';').map((row) => {
-        const [specId, source, players, builds, talents, dungeons, dungeonsWithBuilds] = row.split('|');
-        return { specId: +specId, source, players: +players, builds: +builds, talents: +talents, dungeons: +dungeons, dungeonsWithBuilds: +dungeonsWithBuilds };
+        const [specId, source, players, builds, talents, dungeons, dungeonsWithBuilds, consumables] = row.split('|');
+        return {
+          specId: +specId,
+          source,
+          players: +players,
+          builds: +builds,
+          talents: +talents,
+          dungeons: +dungeons,
+          dungeonsWithBuilds: +dungeonsWithBuilds,
+          consumables: +consumables,
+        };
       })
     : [];
   if (specs.length < minSpecs) problems.push(`Only ${specs.length} specs load in the addon (at least ${minSpecs} expected)`);
@@ -50,17 +66,22 @@ function checkAddonData(text, { minSpecs = 1 } = {}) {
     if (!s.dungeonsWithBuilds) what.push('no dungeon builds');
     if (what.length) problems.push(`Spec ${s.specId}: ${what.join(', ')}`);
   }
+  const warnings = [];
+  const without = specs.filter((s) => !s.consumables);
+  if (without.length) warnings.push(`No consumables for ${without.length} of ${specs.length} specs: ${without.map((s) => s.specId).join(', ')}`);
   // The window with the first spec, as a player of a spec without data would see it.
   addon.run(L, '__ns:TogglePanel(); __runTimers()');
   for (const err of addon.errors(L)) problems.push(`Lua error: ${err}`);
-  return { specs, problems };
+  return { specs, problems, warnings };
 }
 
 function main() {
   const [file, flag, value] = process.argv.slice(2);
   if (!file || (flag && flag !== '--min-specs')) throw new Error('Usage: check-addon-data.js <Data.lua> [--min-specs N]');
-  const { specs, problems } = checkAddonData(fs.readFileSync(file, 'utf8'), { minSpecs: flag ? Number(value) : 1 });
+  const { specs, problems, warnings } = checkAddonData(fs.readFileSync(file, 'utf8'), { minSpecs: flag ? Number(value) : 1 });
   console.log(`${specs.length} specs load in the addon: ${specs.map((s) => `${s.specId} (${s.players})`).join(', ')}`);
+  console.log(`Consumables (players with a logged run): ${specs.map((s) => `${s.specId} (${s.consumables})`).join(', ')}`);
+  for (const w of warnings) console.log(`::warning::${w}`);
   if (problems.length) {
     console.error(problems.join('\n'));
     process.exit(1);

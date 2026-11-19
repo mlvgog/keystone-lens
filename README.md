@@ -6,8 +6,9 @@
 - popular builds with copyable import strings;
 - gear usage per slot, with stats, enchants, gems and where each item drops;
 - the races they play, with each race's racial abilities;
+- the flasks, food and augment runes they use;
 - optionally, damage and healing per dungeon and raid rankings from Warcraft Logs (with your own API key);
-- a **game addon** that shows the same pick rates, builds, gear and races inside World of Warcraft.
+- a **game addon** that shows the same pick rates, builds, gear, consumables and races inside World of Warcraft.
 
 ![Talent tree with pick rates for the top 50 Subtlety Rogues](docs/screenshots/talents.jpg)
 
@@ -40,8 +41,9 @@ Get the latest version from the [**website**](https://mlvgog.github.io/keystone-
 ![Gear overview with stat profile, enchants, gems and per-slot item usage](docs/screenshots/gear.jpg)
 
 - **Items per slot.** Every slot lists the items used and how many players use each one, with the item's exact stats at its item level, enchants and gems. It also shows **where the item drops**: M+ dungeon, raid boss, crafted or tier. Rings and trinkets are combined. Hover an item for its full in-game tooltip.
-- **Overview.** Secondary-stat profile, the races the players play, top enchant per slot, gems and embellishments, tier pieces and weapon setups.
+- **Overview.** Secondary-stat profile, the races the players play, their consumables, top enchant per slot, gems and embellishments, tier pieces and weapon setups.
 - **Races.** How many of the players play each race, with your own race marked. Click a race for a small menu with its racial abilities for the spec's class; hover one for its tooltip.
+- **Consumables.** The flasks, food (by the stat it raises) and augment runes the players use, with their share. They come from the buffs Raider.IO records at each boss pull of runs logged with the Raider.IO client, so they cover the players whose runs were logged (most of the top players). Potions and weapon oils are not recorded there.
 
 ### Players
 
@@ -77,7 +79,7 @@ Get the latest version from the [**website**](https://mlvgog.github.io/keystone-
 The **Keystone Lens addon** brings the Mythic+ data into the game:
 
 - **Talent window.** The pick rate of every talent appears under it, with choice splits on choice nodes. A red frame marks a popular talent you skip, and an orange frame a rare one you take. A switch in the window's title row changes between all dungeons and each dungeon. It starts on the dungeon of your keystone.
-- **The `/kl` window.** The top players' gear as a character pane: each slot shows the most used item with its %, with a tick when you wear it. Click a slot for every option, its enchants, and the gems. In the middle are bars for their secondary stats next to yours, as rating and %. At the bottom are the races they play; click one for its racial abilities. A side pane lists the popular builds per dungeon. Each build shows the talents it changes compared with yours, a Copy button for its string, and **Show on talents**, which frames those changes on your talent window.
+- **The `/kl` window.** The top players' gear as a character pane: each slot shows the most used item with its %, with a tick when you wear it. Click a slot for every option, its enchants, and the gems. In the middle are bars for their secondary stats next to yours, as rating and %, and under them the flask, food and augment rune they use most (hover for the others, and a tick when you carry the top one). At the bottom are the races they play; click one for its racial abilities. A side pane lists the popular builds per dungeon. Each build shows the talents it changes compared with yours, a Copy button for its string, and **Show on talents**, which frames those changes on your talent window.
 - **Item tooltips.** How many top players of your spec use an item.
 - **Your characters in the app.** The addon saves your talents and gear when you log out or `/reload`. They show up under "From the game addon" in **Compare with my character**, so you don't need to paste a SimulationCraft export.
 
@@ -148,7 +150,7 @@ Keystone Lens has no server of its own. Your PC talks to these services directly
 
 | Source | Used for |
 |---|---|
-| [raider.io](https://raider.io) | Top keys, players' scores, races and key history, talent and gear snapshots per key, your character, dungeon, raid and realm lists. Uses the [public API](https://raider.io/api). |
+| [raider.io](https://raider.io) | Top keys, players' scores, races and key history, talent and gear snapshots per key, the buffs at each boss pull of logged keys (consumables), your character, dungeon, raid and realm lists. Uses the [public API](https://raider.io/api). |
 | [Wowhead](https://www.wowhead.com) | Hover tooltips for items and talents, through Wowhead's [official tooltips script](https://www.wowhead.com/tooltips). Where items drop and their type, from Wowhead's documented item XML. |
 | [SimulationCraft](https://github.com/simulationcraft/simc) | Its open game data (GPL-3.0, downloaded from GitHub at runtime, not bundled): talent tree structure, item-level scaling tables and racial abilities. |
 | [wago.tools](https://wago.tools) | Game table exports: talent positions, connections and icons, item stat allocations and bonus IDs. |
@@ -194,7 +196,8 @@ Publishing a release is described in [docs/RELEASING.md](docs/RELEASING.md), the
 | `src/main/selection.js` | Which key represents a player |
 | `src/main/simc.js`, `loadout.js`, `simcImport.js` | SimulationCraft export parsing, in-game talent strings (decode and encode), and your character from an export |
 | `src/main/raid.js`, `raidLoader.js` | Raid mode: Warcraft Logs boss rankings as a session for the views, and boss-specific talent differences |
-| `src/main/views.js` | Filtered statistics for the UI (hero tree, dungeon, build, trends, races) |
+| `src/main/views.js` | Filtered statistics for the UI (hero tree, dungeon, build, trends, races, consumables) |
+| `src/main/consumables.js` | Flasks, food and augment runes from the buffs at boss pulls, told apart with the game's item tables |
 | `src/main/races.js` | Playable races, and their racial abilities from SimulationCraft's game data |
 | `src/main/aggregate.js`, `builds.js`, `gearSummary.js`, `itemInfo.js` | Talent and gear counting, build clustering, stat profile, item source parsing |
 | `src/main/throughput.js` | Damage and healing statistics |

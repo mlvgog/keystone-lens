@@ -387,6 +387,54 @@ test('data from before races were exported shows a hint instead of the races', a
   assert.deepEqual(addon.errors(L), []);
 });
 
+test('the overview shows the flasks, food and augment runes of the top players, and whether you carry them', async () => {
+  const L = addon.loadAddon({ before: [await appData()] });
+  addon.run(L, '__bags[5002] = 3'); // Flask of A (its second quality rank)
+  addon.run(L, '__ns:TogglePanel(); __runTimers()');
+
+  const rows = addon.evaluate(L, '__ns.ConsumableRows(__ns:GetSpecData(64))');
+  assert.deepEqual(
+    rows.map((r) => [r.key, r.label, r.used, r.players, r.options.map((o) => [o.name, o.n, Math.round(o.share * 100), o.have ?? null])]),
+    [
+      ['flask', 'Flask', 4, 4, [['Flask of A', 2, 50, 3], ['Flask of B', 2, 50, 0]]],
+      ['food', 'Food', 4, 4, [['Haste food', 3, 75, null], ['Primary stat food', 1, 25, null]]],
+      ['rune', 'Augment rune', 3, 4, [['Void-Touched Augment Rune', 3, 75, 0]]],
+    ]
+  );
+  assert.equal(rows[0].options[0].icon, 'Interface\\Icons\\inv_flask_a');
+
+  const strip = 'KeystoneLensFrame.overview.consumables';
+  assert.equal(addon.evaluate(L, `${strip}.shown`), true);
+  assert.deepEqual(
+    [1, 2, 3].map((i) => [addon.evaluate(L, `${strip}.buttons[${i}].pct.text`), addon.evaluate(L, `${strip}.buttons[${i}].tick.shown`)]),
+    [
+      ['50%', true],
+      ['75%', false],
+      ['75%', false],
+    ]
+  );
+  addon.run(L, `${strip}.buttons[1].scripts.OnEnter(${strip}.buttons[1])`);
+  const flask = addon.evaluate(L, 'GameTooltip.lines');
+  assert.equal(flask[0], 'Flask');
+  assert.match(flask[1], /^Flask of A \|T.*ReadyCheck-Ready.* 50%$/);
+  assert.equal(flask[2], 'Flask of B 50%');
+  assert.equal(flask[3], 'You carry 3 Flask of A.');
+  assert.match(flask[4], /4 top players' runs logged with the Raider.IO client/);
+  addon.run(L, `${strip}.buttons[3].scripts.OnEnter(${strip}.buttons[3])`);
+  const rune = addon.evaluate(L, 'GameTooltip.lines');
+  assert.equal(rune[2], 'None 25%');
+  assert.equal(rune[3], 'You carry no Void-Touched Augment Rune.');
+  assert.deepEqual(addon.errors(L), []);
+});
+
+test('data without consumables hides the consumables row', async () => {
+  const L = addon.loadAddon({ before: [await appData({ consumables: undefined })] });
+  addon.run(L, '__ns:TogglePanel(); __runTimers()');
+  assert.equal(addon.evaluate(L, `#__ns.ConsumableRows(__ns:GetSpecData(64))`), 0);
+  assert.equal(addon.evaluate(L, 'KeystoneLensFrame.overview.consumables.shown'), false);
+  assert.deepEqual(addon.errors(L), []);
+});
+
 test('the build pane lists the builds and what each changes in yours', async () => {
   const L = await openWindow();
   const card = (i, field) => addon.evaluate(L, `KeystoneLensBuildsFrame.cards[${i}].${field}`);

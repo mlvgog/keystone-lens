@@ -5,6 +5,7 @@ const { clusterBuilds, buildDiffs } = require('./builds');
 const { statProfile, summarizeGear } = require('./gearSummary');
 const history = require('./history');
 const { raceByKey } = require('./races');
+const { summarizeConsumables } = require('./consumables');
 
 /** The key a player is represented by: their overall pick, or their key in one dungeon. */
 function dataFor(player, dungeon) {
@@ -134,6 +135,8 @@ async function buildView(session, filters, deps = {}) {
     gearSummary: summarizeGear(agg, session.itemInfo || {}, session.itemSources || {}),
     statProfile: statProfile(agg, session.itemInfo || {}),
     races: raceSummary(filtered, meta),
+    // Flasks, food and augment runes (Raider.IO's logged runs); null in raid mode.
+    consumables: meta.mode === 'raid' ? null : summarizeConsumables(filtered.map((x) => x.d), session.auraInfo || {}),
     avgItemLevel: filtered.length ? filtered.reduce((s, x) => s + (x.d.itemLevel || 0), 0) / filtered.length : 0,
     fallbackCount: filtered.filter((x) => x.d.fallback).length,
     players,

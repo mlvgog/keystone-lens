@@ -10,6 +10,7 @@ const { createDiscovery, poolTarget, rankByScore, specIndexOf } = require('./dis
 const { heroSubTrees, variantKeyOf, gearItems } = require('./aggregate');
 const { classifySource } = require('./itemInfo');
 const { raceOf } = require('./races');
+const consumables = require('./consumables');
 
 const PHASES = [
   { name: 'Loading talent data', weight: 3 },
@@ -20,7 +21,7 @@ const PHASES = [
   { name: 'Building report', weight: 4 },
 ];
 
-const SESSION_VERSION = 7; // 7: players' races, meta.classId
+const SESSION_VERSION = 8; // 8: buffs at boss pulls (consumables)
 const RECENT_PROBES = 10;
 const ARMORY_LOCALE = { us: 'en-us', eu: 'en-gb', kr: 'ko-kr', tw: 'zh-tw' };
 
@@ -145,6 +146,7 @@ function entryFor(run, member, fallback, seasonSlug) {
     talents: member.talents,
     items: member.items,
     itemLevel: member.itemLevel,
+    buffs: member.buffs || null,
   };
 }
 
@@ -209,6 +211,22 @@ async function enrichItems(session, { signal, progress, seasonDungeons = session
   const described = await itemData.describeVariants(list, { signal });
   for (const v of list) session.itemInfo[v.key] = described[v.key] || { stats: null, primary: null, stamina: 0, sockets: 0, embellished: false };
   progress.step('Item stats');
+}
+
+/**
+ * Tell the consumables (flasks, food, augment runes) among the buffs of the session's logged runs.
+ * Without the game tables (offline) the consumables are left out; the next load tries again.
+ */
+async function enrichConsumables(session, { signal }) {
+  session.auraInfo ||= {};
+  const entries = session.players.flatMap((p) => [p.main, ...Object.values(p.dungeons || {})]);
+  const auras = consumables.unclassifiedAuras(entries, session.auraInfo);
+  if (!auras.length) return;
+  try {
+    Object.assign(session.auraInfo, await consumables.classifyAuras(auras, { signal }));
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
+  }
 }
 
 /**
@@ -419,6 +437,7 @@ async function analyze(opts, { signal, onProgress, force = false, allowStale = f
   // 5. Item data: stats, embellishments, sources
   progress.phase(4, 0, 'Item data (Wowhead item XML + game tables)');
   await enrichItems(session, { signal, progress });
+  await enrichConsumables(session, { signal });
 
   progress.phase(5, 1, 'Building report');
   progress.step('Done');
@@ -466,6 +485,7 @@ async function loadDungeon(session, zoneId, { signal, onProgress } = {}) {
     );
     progress.phase(1, 0, 'Item data (Wowhead item XML + game tables)');
     await enrichItems(session, { signal, progress });
+    await enrichConsumables(session, { signal });
   } catch (err) {
     for (const p of session.players) if (p.dungeons) delete p.dungeons[zoneId];
     throw err;
